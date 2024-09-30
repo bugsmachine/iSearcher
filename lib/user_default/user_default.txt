@@ -1,0 +1,3 @@
+films_folder="/a/c.v/c";
+abc="1";
+is_first_run="0";
