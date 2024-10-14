@@ -9,7 +9,7 @@ Future<void> initDatabase() async {
   print("initDatabase");
   db = await openDatabase(
     join(await getDatabasesPath(), 'movies_database.db'),
-    version: 23, // Increment the version number
+    version: 24, // Increment the version number
     onCreate: (db, version) {
       print("onCreate");
       return db.transaction((txn) async {
@@ -114,12 +114,26 @@ Future<void> initDatabase() async {
 
         // add a default row value in config with ID "search_engine"
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('search_engine', 'https://www.google.com');''');
+        await txn.execute('''INSERT INTO Config(id, value) VALUES ('platform', 'null2');''');
         // Indexes for efficient searching
         await txn.execute('CREATE INDEX idx_keyword_id ON MovieKeywords(keyword_id)');
         await txn.execute('CREATE INDEX idx_movie_id ON MovieKeywords(movie_id)');
       });
     },
   );
+}
+
+// update the config
+Future<void> updateConfig(String key, String value) async {
+  print("updateConfig of key:  $key value: $value");
+  await db.update('Config', {'value': value}, where: 'id = ?', whereArgs: [key]);
+
+}
+
+// insert a new config
+Future<void> insertConfig(String key, String value) async {
+  print("insertConfig of key:  $key value: $value");
+  await db.insert('Config', {'id': key, 'value': value});
 }
 
 Future<String> getConfig(String key) async {
