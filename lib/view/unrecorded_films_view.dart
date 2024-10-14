@@ -62,6 +62,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
   Future<void> _loadFilmsFolder() async {
+
     final secureBookmarks = SecureBookmarks();
     final bookmark = await getUserDefaultOfLine1('bookMarks');
     if (bookmark == "bookmark_placeholder") {
