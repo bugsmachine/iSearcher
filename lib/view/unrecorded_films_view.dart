@@ -24,6 +24,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   List<Widget> tagFields = [];
   String? _searchEngine;
   String? _modalErrorMessage;
+  String? _platform;
 
   List<TextEditingController> _tagControllers = [];
   TextEditingController filmNameController = TextEditingController();
@@ -38,7 +39,18 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   void initState() {
     super.initState();
     _loadFilmsFolder();
+    _loadOther();
   }
+
+
+  Future<void> _loadOther() async{
+    String platform = await getConfig('platform');
+    print("platform: $platform");
+    setState(() {
+      _platform = platform;
+    });
+  }
+
 
   Future<void> _loadFilmsFolder() async {
     final secureBookmarks = SecureBookmarks();
@@ -52,6 +64,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       List<String> categories = await getCategories();
       String engine = await getConfig('search_engine');
       print("engine: $engine");
+
       setState(() {
         _selectedOption = lastFolder;
         _options.add(lastFolder);
@@ -130,21 +143,25 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 onPressed: () async {
                   String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
                   if (selectedDirectory != null) {
-                    final secureBookmarks = SecureBookmarks();
-                    final directory = Directory(selectedDirectory);
-                    try {
-                      final bookmark = await secureBookmarks.bookmark(directory);
-                      await setUserDefaultOfLine1(bookmark, selectedDirectory);
-                      setState(() {
-                        _filmsFolder = selectedDirectory;
-                        _isLoading = true;
-                      });
-                      await _loadVideoFiles();
-                      setState(() {
-                        _isLoading = false;
-                      });
-                    } catch (e) {
-                      print('Error creating bookmark: $e');
+                    if(_platform == 'macos'){
+                      final secureBookmarks = SecureBookmarks();
+                      final directory = Directory(selectedDirectory);
+                      try {
+                        final bookmark = await secureBookmarks.bookmark(directory);
+                        await setUserDefaultOfLine1(bookmark, selectedDirectory);
+                        setState(() {
+                          _filmsFolder = selectedDirectory;
+                          _isLoading = true;
+                        });
+                        await _loadVideoFiles();
+                        setState(() {
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        print('Error creating bookmark: $e');
+                      }
+                    }else{
+                      print("Platform not supported");
                     }
                   }
                 },
@@ -172,22 +189,31 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 onPressed: () async {
                   String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
                   if (selectedDirectory != null) {
-                    final secureBookmarks = SecureBookmarks();
-                    final directory = Directory(selectedDirectory);
-                    try {
-                      final bookmark = await secureBookmarks.bookmark(directory);
-                      await setUserDefaultOfLine1(bookmark, selectedDirectory);
-                      setState(() {
-                        _filmsFolder = selectedDirectory;
-                        _isLoading = true;
-                      });
-                      await _loadVideoFiles();
-                      await appConfigInit(selectedDirectory);
-                      setState(() {
-                        _isLoading = false;
-                      });
-                    } catch (e) {
-                      print('Error creating bookmark: $e');
+                    print(_platform);
+                    if(_platform == 'macos'){
+                      final secureBookmarks = SecureBookmarks();
+                      final directory = Directory(selectedDirectory);
+                      try {
+                        final bookmark = await secureBookmarks.bookmark(directory);
+                        await setUserDefaultOfLine1(bookmark, selectedDirectory);
+                        //get last folder name
+                        List<String> folders = selectedDirectory.split('/');
+                        String lastFolder = folders[folders.length - 1];
+                        setState(() {
+                          _filmsFolder = selectedDirectory;
+                          _selectedOption = lastFolder;
+                          _options.add(lastFolder);
+                          _isLoading = true;
+                        });
+                        await _loadVideoFiles();
+                        setState(() {
+                          _isLoading = false;
+                        });
+                      } catch (e) {
+                        print('Error creating bookmark: $e');
+                      }
+                    }else{
+                      print("Platform not supported");
                     }
                   }
                 },
