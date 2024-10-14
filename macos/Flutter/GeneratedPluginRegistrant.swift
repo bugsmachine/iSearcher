@@ -10,7 +10,7 @@ import macos_secure_bookmarks
 import path_provider_foundation
 import screen_retriever
 import shared_preferences_foundation
-import sqflite_darwin
+import sqflite
 import url_launcher_macos
 import window_manager
 

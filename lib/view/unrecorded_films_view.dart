@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:home_cinema_app/service/main_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../component/inner_top_bar.dart';
 import '../repository/db.dart';
 import '../models/video_file.dart';
