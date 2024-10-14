@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:home_cinema_app/view/all_movies_view.dart';
@@ -34,25 +33,17 @@ void main(List<String> args) async {
 
   await initDatabase();
 
-  //check the running platform
-  String platform = await getConfig("platform");
-  if(platform == "null2") {
-    if (Platform.isWindows) {
-      updateConfig("platform", "windows");
-    } else {
-      updateConfig("platform", "macos");
-    }
-  }
+  // final mainWindow = await DesktopMultiWindow.createWindow(jsonEncode({
+  //   'view': 'main',
+  // }));
+  //
+  // mainWindow
+  //   ..setFrame(const Offset(100, 100) & const Size(1000, 700))
+  //   ..center()
+  //   ..setTitle('Movie Searcher')
+  //   ..show();
 
   runApp(const MyApp());
-
-  const platform1 = MethodChannel('com.example.app/settings');
-
-  platform1.setMethodCallHandler((MethodCall call) async {
-    if (call.method == 'openSettings') {
-      openSettingsWindow();
-    }
-  });
 }
 
 Future<void> openSettingsWindow() async {
@@ -61,12 +52,13 @@ Future<void> openSettingsWindow() async {
   }));
 
   window
-    ..setFrame(const Offset(100, 100) & const Size(800, 400))
+    ..setFrame(const Offset(100, 100) & const Size(600, 400))
     ..center()
     ..setTitle('Settings')
     ..show();
-
 }
+
+
 
 class SettingsApp extends StatelessWidget {
   @override
