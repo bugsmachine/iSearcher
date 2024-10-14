@@ -197,7 +197,7 @@ Future<void> _getVideoFilesRecursively(Directory dir, List<VideoFile> videoFiles
         if (videoExtensions.any((extension) => entity.path.toLowerCase().endsWith(extension))) {
           final fileStat = await entity.stat();
           // add movie which have size > 1gb
-          if (fileStat.size > 1000000000) {
+          if (fileStat.size > 1) {
             videoFiles.add(VideoFile(
               name: entity.uri.pathSegments.last,
               path: entity.path,
