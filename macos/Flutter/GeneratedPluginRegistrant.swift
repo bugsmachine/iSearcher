@@ -8,7 +8,7 @@ import Foundation
 import desktop_multi_window
 import macos_secure_bookmarks
 import screen_retriever
-import sqflite
+import sqflite_darwin
 import url_launcher_macos
 import window_manager
 

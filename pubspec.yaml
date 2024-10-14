@@ -29,6 +29,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   sqflite: ^2.0.0+3
+  sqflite_common_ffi: ^2.0.0
   path: ^1.8.0
   window_manager: ^0.4.2
   desktop_multi_window: ^0.2.0

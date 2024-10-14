@@ -193,8 +193,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 },
                 child: Text('Select Folder'),
                 style: ElevatedButton.styleFrom(
-                  primary: Colors.blue,
-                  onPrimary: Colors.white,
+                  foregroundColor: Colors.white, backgroundColor: Colors.blue,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -223,8 +222,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                     onPressed: _rescanFolder,
                     child: Text('Re-scan'),
                     style: ElevatedButton.styleFrom(
-                      primary: Colors.blue,
-                      onPrimary: Colors.white,
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.blue,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
