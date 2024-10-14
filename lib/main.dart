@@ -1,31 +1,69 @@
+import 'dart:convert';
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:home_cinema_app/view/all_movies_view.dart';
+import 'package:home_cinema_app/view/unrecorded_films_view.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/services.dart';
-import 'package:window_manager/window_manager.dart';
 import 'repository/db.dart';
 import 'service/main_service.dart';
+import 'package:home_cinema_app/app_config/colors.dart';
+import '../component/modal.dart';
+import 'view/settings.dart';
 
-late Database database;
-
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await windowManager.ensureInitialized();
 
-  WindowOptions windowOptions = const WindowOptions(
-    size: Size(1000, 700),
-    center: true,
-    backgroundColor: Colors.transparent,
-    skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.hidden,
-  );
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.show();
-    await windowManager.focus();
-  });
+  if (args.isNotEmpty && args.first == 'multi_window') {
+    final windowId = int.parse(args[1]);
+    final arguments = args[2].isEmpty ? const {} : jsonDecode(args[2]) as Map<String, dynamic>;
 
-  database = await initDatabase();
+    if (arguments['view'] == 'settings') {
+      runApp(SettingsApp());
+    } else {
+      // Handle other potential windows here
+    }
+    return;
+  }
+
+  await initDatabase();
+
+  // final mainWindow = await DesktopMultiWindow.createWindow(jsonEncode({
+  //   'view': 'main',
+  // }));
+  //
+  // mainWindow
+  //   ..setFrame(const Offset(100, 100) & const Size(1000, 700))
+  //   ..center()
+  //   ..setTitle('Movie Searcher')
+  //   ..show();
+
   runApp(const MyApp());
 }
+
+Future<void> openSettingsWindow() async {
+  final window = await DesktopMultiWindow.createWindow(jsonEncode({
+    'view': 'settings',
+  }));
+
+  window
+    ..setFrame(const Offset(100, 100) & const Size(600, 400))
+    ..center()
+    ..setTitle('Settings')
+    ..show();
+}
+
+class SettingsApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: SettingsWindow(),
+      theme: ThemeData(useMaterial3: true),
+    );
+  }
+}
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -33,9 +71,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Movie Searcher',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
       home: const HomeScreen(),
@@ -50,38 +88,38 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WindowListener {
+class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   final TextEditingController _searchController = TextEditingController();
 
   @override
-  void initState() {
-    windowManager.addListener(this);
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    windowManager.removeListener(this);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
-          _buildTitleBar(),
-          Expanded(
-            child: Row(
-              children: [
-                _buildSidebar(),
-                VerticalDivider(thickness: 1, width: 1),
-                Expanded(
-                  child: _buildMainContent(),
+          Row(
+            children: [
+              SizedBox(
+                width: 250,
+                child: _buildSidebar(),
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildTitleBar(),
+                    Expanded(
+                      child: _buildMainContent(),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          const Positioned(
+            left: 250,
+            top: 0,
+            bottom: 0,
+            child: VerticalDivider(thickness: 1, width: 1),
           ),
         ],
       ),
@@ -91,34 +129,79 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   Widget _buildTitleBar() {
     return Container(
       height: 40,
-      color: Colors.blue.shade700,
+      color: Colors.white60,
       child: Row(
         children: [
-          SizedBox(width: 80), // Space for native window controls
+          const SizedBox(width: 5),
+          IconButton(
+            icon: Icon(Icons.filter_list, color: Colors.grey[105]),
+            onPressed: () {
+              print("Filter icon clicked!");
+            },
+          ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               child: TextField(
                 controller: _searchController,
+                textAlign: TextAlign.center,
                 decoration: InputDecoration(
                   hintText: 'Search movies...',
-                  prefixIcon: Icon(Icons.search, color: Colors.white),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.search, color: Colors.grey[105]),
+                    onPressed: () {
+                      print("Search icon clicked!");
+                    },
+                  ),
+                  contentPadding: EdgeInsets.all(10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(color: AppColors.black),
                   ),
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.2),
                 ),
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.black),
               ),
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.add, color: Colors.yellow),
-            onPressed: () {
-              // TODO: Implement add functionality
-            },
+          SizedBox(
+            width: 120,
+            child: IconButton(
+              icon: const Icon(Icons.add, color: Colors.yellow),
+              onPressed: () {
+                CustomModal.show(
+                  context,
+                  'Modal Title',
+                  const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Enter something...',
+                        ),
+                      ),
+                    ],
+                  ),
+                  [
+                    TextButton(
+                      child: Text('Cancel'),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    TextButton(
+                      child: Text('Submit'),
+                      onPressed: () {
+                        // Handle submit action
+                      },
+                    ),
+                  ],
+                  width: 300,
+                  height: 200,
+                );
+              },
+            ),
           ),
           SizedBox(width: 8),
         ],
@@ -127,51 +210,76 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   }
 
   Widget _buildSidebar() {
-    return NavigationRail(
-      extended: true,
-      backgroundColor: Colors.grey[200],
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: (int index) {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
-      destinations: const [
-        NavigationRailDestination(
-          icon: Icon(Icons.movie_outlined),
-          selectedIcon: Icon(Icons.movie),
-          label: Text('Unrecorded Films'),
-        ),
-        NavigationRailDestination(
-          icon: Icon(Icons.category_outlined),
-          selectedIcon: Icon(Icons.category),
-          label: Text('Category'),
-        ),
-        NavigationRailDestination(
-          icon: Icon(Icons.settings_outlined),
-          selectedIcon: Icon(Icons.settings),
-          label: Text('Settings'),
-        ),
-      ],
+    return Container(
+      color: Colors.grey[200],
+      padding: const EdgeInsets.only(top: 4.0),
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 30.0),
+            child: Text(
+              'iSearcher',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          Expanded(
+            child: NavigationRail(
+              extended: true,
+              backgroundColor: Colors.grey[200],
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (int index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+                if (index == 3) {
+                  openSettingsWindow();
+                }
+              },
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.movie_outlined),
+                  selectedIcon: Icon(Icons.movie),
+                  label: Text('All Movies'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.video_library_outlined),
+                  selectedIcon: Icon(Icons.video_library),
+                  label: Text('Unrecorded Films'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.category_outlined),
+                  selectedIcon: Icon(Icons.category),
+                  label: Text('Category'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings),
+                  label: Text('Settings'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildMainContent() {
     switch (_selectedIndex) {
       case 0:
-        return Center(child: Text('Unrecorded Films'));
+        return AllMoviesView();
       case 1:
-        return Center(child: Text('Category'));
+        return UnrecordedFilmsView();
       case 2:
-        return Center(child: Text('Settings'));
+        return const Center(child: Text('Category'));
+      case 3:
+        return const Center(child: Text('Settings')); // Placeholder for settings
       default:
-        return Center(child: Text('Unknown Page'));
+        return const Center(child: Text('Unknown Page'));
     }
-  }
-
-  @override
-  void onWindowFocus() {
-    // Make sure to repaint the widget tree when the window regains focus
-    setState(() {});
   }
 }

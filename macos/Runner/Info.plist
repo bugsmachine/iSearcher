@@ -28,5 +28,32 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSAppleEventsUsageDescription</key>
+    <string>This app needs access to your files.</string>
+    <key>NSFileProviderPresenceUsageDescription</key>
+    <string>This app needs access to your files.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+      <key>NSAllowsArbitraryLoads</key>
+      <true/>
+    </dict>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+      <string>http</string>
+      <string>https</string>
+    </array>
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/bugsmachine/iSearcher/main/appcast.xml</string>
+    <key>SUHasLaunchedBefore</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUPublicEDKey</key>
+    <string>jAp8xUKshOYA1yix9LD5nLoJy5zK9ej1ZHQYOMFNbFU=</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+      <key>NSAllowsArbitraryLoads</key>
+      <true/>
+    </dict>
 </dict>
 </plist>

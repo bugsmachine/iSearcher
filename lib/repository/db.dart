@@ -1,13 +1,15 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../service/main_service.dart';
 
+late Database db;
 
 // Initialize the database
-Future<Database> initDatabase() async {
+Future<void> initDatabase() async {
   print("initDatabase");
-  return openDatabase(
+  db = await openDatabase(
     join(await getDatabasesPath(), 'movies_database.db'),
-    version: 3, // Increment the version number
+    version: 21, // Increment the version number
     onCreate: (db, version) {
       print("onCreate");
       return db.transaction((txn) async {
@@ -52,6 +54,9 @@ Future<Database> initDatabase() async {
         await txn.execute('DROP TABLE IF EXISTS Movies');
         await txn.execute('DROP TABLE IF EXISTS Keywords');
         await txn.execute('DROP TABLE IF EXISTS MovieKeywords');
+        await txn.execute('DROP TABLE IF EXISTS Categories');
+        await txn.execute('DROP TABLE IF EXISTS UserDefault');
+        await txn.execute('DROP TABLE IF EXISTS Config');
 
         // Recreate tables with new schema
         await txn.execute('''
@@ -79,6 +84,22 @@ Future<Database> initDatabase() async {
     ''');
 
         await txn.execute('''
+  CREATE TABLE UserDefault (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bookMarks TEXT NOT NULL,
+    films_folder TEXT NOT NULL,
+    last_db_modified TEXT NOT NULL
+  )
+''');
+
+        await txn.execute('''
+      CREATE TABLE Config (
+        id TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
+        await txn.execute('''
       CREATE TABLE MovieKeywords (
         movie_id INTEGER,
         keyword_id INTEGER,
@@ -88,21 +109,55 @@ Future<Database> initDatabase() async {
       )
     ''');
 
+        // add a default row value in user default
+        await txn.execute('''INSERT INTO UserDefault(bookMarks,films_folder, last_db_modified) VALUES ('null1','null1','null1');''');
+
+        // add a default row value in config with ID "search_engine"
+        await txn.execute('''INSERT INTO Config(id, value) VALUES ('search_engine', 'https://www.google.com');''');
+        // Indexes for efficient searching
         await txn.execute('CREATE INDEX idx_keyword_id ON MovieKeywords(keyword_id)');
         await txn.execute('CREATE INDEX idx_movie_id ON MovieKeywords(movie_id)');
       });
     },
   );
 }
-Future<void> printAll(Database db) async{
+
+Future<String> getConfig(String key) async {
+  print("getConfig of key:  " + key);
+  List<Map<String, dynamic>> config = await db.query('Config', where: 'id = ?', whereArgs: [key]);
+  return config[0]['value'];
+}
+
+Future<void> printAll() async{
   print("printAll");
-  await printAllMovies(db);
-  await printAllKeywords(db);
-  await printAllMovieKeywords(db);
+  await printAllMovies();
+  await printAllKeywords();
+  await printAllMovieKeywords();
+}
+
+Future<List<String>> getCategories() async {
+  print("getCategories");
+  List<Map<String, dynamic>> categories = await db.query('Categories');
+  List<String> categoryNames = [];
+  for (var category in categories) {
+    categoryNames.add(category['name']);
+  }
+  return categoryNames;
+}
+
+Future<void> insertCategory(String name) async {
+  print("insertCategory: $name");
+  await db.insert('Categories', {'name': name});
+}
+
+// delete a category by name
+Future<void> deleteCategory(String name) async {
+  print("deleteCategory: $name");
+  await db.delete('Categories', where: 'name = ?', whereArgs: [name]);
 }
 
 // Function to print all data in the Movies table
-Future<void> printAllMovies(Database db) async {
+Future<void> printAllMovies() async {
   List<Map<String, dynamic>> movies = await db.query('Movies');
   for (var movie in movies) {
     print('Movie ID: ${movie['id']}, Path: ${movie['path']}');
@@ -110,7 +165,7 @@ Future<void> printAllMovies(Database db) async {
 }
 
 // Function to print all data in the MovieKeywords table
-Future<void> printAllMovieKeywords(Database db) async {
+Future<void> printAllMovieKeywords() async {
   List<Map<String, dynamic>> movieKeywords = await db.query('MovieKeywords');
   for (var movieKeyword in movieKeywords) {
     print('Movie ID: ${movieKeyword['movie_id']}, Keyword ID: ${movieKeyword['keyword_id']}');
@@ -118,15 +173,59 @@ Future<void> printAllMovieKeywords(Database db) async {
 }
 
 // Function to print all data in the Keywords table
-Future<void> printAllKeywords(Database db) async {
+Future<void> printAllKeywords() async {
   List<Map<String, dynamic>> keywords = await db.query('Keywords');
   for (var keyword in keywords) {
     print('Keyword ID: ${keyword['id']}, Keyword: ${keyword['keyword']}');
   }
 }
 
+// get the film_folder of row 1 from table UserDefault, if not exist return null
+Future<String?> getUserDefaultOfLine1(String key) async {
+  print("getUserDefaultOfLine1");
+
+  List<Map<String, dynamic>> userDefaults = await db.query('UserDefault');
+  for (var userDefault in userDefaults) {
+    if (userDefault['id'] == 1) {
+      return userDefault[key];
+    }
+  }
+  return null;
+}
+
+// set the film_folder of row 1 from table UserDefault
+Future<void> setUserDefaultOfLine1(String bookMark, String filmFolder) async {
+  print("setUserDefaultOfLine1");
+  await db.update('UserDefault', {'bookMarks': bookMark, 'films_folder': filmFolder, 'last_db_modified': DateTime.now().toIso8601String()}, where: 'id = ?', whereArgs: [1]);
+  String writeFilePath = '$filmFolder/config';
+  String data = '''
+  {
+    "bookMarks": "$bookMark",
+    "films_folder": "$filmFolder",
+    "last_db_modified": "${DateTime.now().toIso8601String()}"
+  },
+  ''';
+  writeDataToFile(filmFolder, "user_default.txt", data);
+}
+
+// set the film_folder of row 1 from table UserDefault
+Future<void> addNewUserDefault(String bookMark, String filmFolder) async {
+  print("addNewUserDefault");
+  await db.insert('UserDefault', {'bookMarks': bookMark, 'films_folder': filmFolder, 'last_db_modified': DateTime.now().toIso8601String()});
+  // String writeFilePath = '$filmFolder/config';
+  // String data = '''
+  // {
+  //   "bookMarks": "$bookMark",
+  //   "films_folder": "$filmFolder",
+  //   "last_db_modified": "${DateTime.now().toIso8601String()}"
+  // },
+  // ''';
+  // writeDataToFile(filmFolder, "user_default.txt", data);
+}
+
+
 // Function to insert a movie and its associated keywords
-Future<void> insertMovie(Database db, String path, List<String> keywords) async {
+Future<void> insertMovie(String path, List<String> keywords) async {
 
   print("insertMovie" + path);
   // Insert movie into Movies table
@@ -158,7 +257,7 @@ Future<void> insertMovie(Database db, String path, List<String> keywords) async 
 }
 
 // Function to search movies by keyword
-Future<List<Map<String, dynamic>>> searchMoviesByKeyword(Database db, String keyword) async {
+Future<List<Map<String, dynamic>>> searchMoviesByKeyword(String keyword) async {
   print("searchMoviesByKeyword     " + keyword);
   return await db.rawQuery('''
     SELECT Movies.path
