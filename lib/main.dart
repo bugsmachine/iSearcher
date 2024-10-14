@@ -6,6 +6,7 @@ import 'package:home_cinema_app/view/all_movies_view.dart';
 import 'package:home_cinema_app/view/unrecorded_films_view.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 import 'repository/db.dart';
 import 'service/main_service.dart';
 import 'package:home_cinema_app/app_config/colors.dart';
@@ -26,6 +27,22 @@ void main(List<String> args) async {
     }
     return;
   }
+
+  // Initialize window manager
+  await windowManager.ensureInitialized();
+
+  // Remove the title bar
+  if (Platform.isMacOS) {
+    WindowOptions windowOptions = const WindowOptions(
+      titleBarStyle: TitleBarStyle.hidden,
+    );
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
+
+
 
   await initDatabase();
 

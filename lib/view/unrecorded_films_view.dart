@@ -299,7 +299,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 ],
               ),
             )
-                : ListView.builder(
+            :ListView.builder(
               itemCount: _videoFiles.length,
               itemBuilder: (context, index) {
                 final videoFile = _videoFiles[index];
@@ -335,6 +335,14 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 ],
                               ),
                             ),
+                            // Add a Play button here
+                            IconButton(
+                              icon: Icon(Icons.play_circle_outline_outlined, color: Colors.blue),
+                              onPressed: () {
+                                print('Playing: ${videoFile.path}');  // Print the file path
+                              },
+                            ),
+                            SizedBox(width: 28),
                           ],
                         ),
                       ),
