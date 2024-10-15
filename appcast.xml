@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>iSearcher</title>
+        <item>
+            <title>1.0.0</title>
+            <pubDate>Tue, 15 Oct 2024 23:45:39 +0800</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.14</sparkle:minimumSystemVersion>
+            <enclosure url="https://raw.githubusercontent.com/bugsmachine/iSearcher/main/iSearcher.zip" length="37836893" type="application/octet-stream" sparkle:edSignature="6GgGDpLxpL2DBhkJeMaffUsi9AN/B91Vk2v2pIZutq3Oa7z6EgI4EnZmjfU1pd1rSGRmsrEi/ce4q1V5OGCcAA=="/>
+        </item>
+    </channel>
+</rss>
