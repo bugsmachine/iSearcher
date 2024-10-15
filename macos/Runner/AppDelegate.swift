@@ -34,6 +34,11 @@ class AppDelegate: FlutterAppDelegate {
             settingsItem.target = self
             settingsItem.isEnabled = true
         }
+        
+        let bundleIdentifier = Bundle.main.bundleIdentifier!
+        let appVersion = "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))"
+        print("Bundle Identifier: \(bundleIdentifier)")
+        print("App Version: \(appVersion)")
     }
 
     override func applicationDidFinishLaunching(_ notification: Notification) {
@@ -42,6 +47,7 @@ class AppDelegate: FlutterAppDelegate {
 
         // Optionally, you can set Sparkle to check for updates in the background
         updaterController.updater.checkForUpdatesInBackground()
+        // print the current version
     }
 
     override func applicationDidBecomeActive(_ notification: Notification) {
