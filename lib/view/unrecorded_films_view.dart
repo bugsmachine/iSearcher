@@ -19,7 +19,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   String? _filmsFolder;
   String? _selectedOption = 'All Folder';
   final List<String> _options = ['All Folder'];
-  List<VideoFile> _videoFiles = [];
+  List<VideoFile> _videoFiles = [VideoFile(name: "empty", path: "empty_placeholder", size: 0, lastModified: DateTime.now())];
   bool _isLoading = false;
   List<Widget> tagFields = [];
   String? _searchEngine;
@@ -27,7 +27,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   String? _platform;
 
   // a map to hold the options and their values, default is 'All Folder': 'All Folder'
-  Map<String, String> _optionsMap = {'All Folder': 'All Folder'};
+  Map<String, List<String>> _optionsMap = {'All Folder': ['All Folder', 'All Folder']};
   List<Map<String, dynamic>> _allFilmsFolder = [];
 
   List<TextEditingController> _tagControllers = [];
@@ -80,7 +80,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         // add only if the folder is not already in the options
         if (!_options.contains(lastFolder) && lastFolder != 'null1') {
           _options.add(lastFolder);
-          _optionsMap[lastFolder] = fileFolder;
+          _optionsMap[lastFolder] = [fileFolder, folder['bookMarks']];
         }
       }
       print("options: $_options");
@@ -97,7 +97,6 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         _filmsFolder = folder;
         _isLoading = true;
       });
-
       await _loadVideoFiles();
       setState(() {
         _isLoading = false;
@@ -121,6 +120,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
           _filmsFolder = resolvedFile.path;
           _isLoading = true;
         });
+        // await Future.delayed(Duration(milliseconds: 200));
         await _loadVideoFiles();
         setState(() {
           _isLoading = false;
@@ -136,11 +136,21 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
   Future<void> _loadAllVideoFiles() async {
+    final secureBookmarks = SecureBookmarks();
     List<VideoFile> allList = [];
-    for(var option in _optionsMap.entries){
-      _filmsFolder = option.value;
-      List<VideoFile> list = await readVideoFiles(_filmsFolder!);
-      allList.addAll(list);
+    for (var option in _optionsMap.entries) {
+      if(option.key != 'All Folder'){
+        _filmsFolder = option.value[0];
+        String? bookmark = option.value[1];
+        final resolvedFile = await secureBookmarks.resolveBookmark(bookmark);
+        await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+        try {
+          List<VideoFile> list = await readVideoFiles(_filmsFolder!);
+          allList.addAll(list);
+        } finally {
+          await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+        }
+      }
     }
     setState(() {
       _videoFiles = allList;
@@ -156,6 +166,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
   Future<void> _onDropdownChanged(String? newValue) async {
+    final secureBookmarks = SecureBookmarks();
     setState(() {
       _selectedOption = newValue;
     });
@@ -163,11 +174,20 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       _filmsFolder = "All Folder";
       await _loadAllVideoFiles();
     }else{
-      _filmsFolder = _optionsMap[newValue];
-      await _loadVideoFiles();
+      _filmsFolder = _optionsMap[newValue]?[0];
+      String? bookmark = _optionsMap[newValue]?[1];
+      final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
+      await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+      try{
+        await _loadVideoFiles();
+      }finally{
+        await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+      }
     }
     print("Selected: $_selectedOption");
   }
+
+
 
   Future<void> _rescanFolder() async {
     if (_filmsFolder != null) {
@@ -203,16 +223,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         // For Windows
         try {
           // Get last folder name
-          List<String> folders = selectedDirectory.split('\\'); // Use Windows path separator
-          String lastFolder = folders[folders.length - 1];
           setState(() {
-            _filmsFolder = selectedDirectory;
-            _selectedOption = lastFolder;
-            _options.add(lastFolder);
             _isLoading = true;
           });
+          await appConfigInit(selectedDirectory);
           await setUserDefaultOfLine1("bookmark_placeholder", selectedDirectory);
-          await _loadVideoFiles();
+          _loadFilmsFolder();
           setState(() {
             _isLoading = false;
           });
@@ -275,7 +291,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 ),
               ),
             )
-                : _isLoading
+                : _isLoading || _videoFiles[0].name == "empty"
                 ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -303,6 +319,50 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
+                  ),
+                ],
+              ),
+            )
+            : _videoFiles[0].size == -9999
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // show an error icon
+                  const Icon(Icons.warning_amber_outlined, color: Colors.red, size: 48),
+                  SizedBox(height: 5),
+                  Text('iSearcher cannot open the folder or scan the video file', style: TextStyle(color: Colors.grey[600])),
+                  // show the error code and content
+                  Text('Error Code: ${_videoFiles[0].name}', style: TextStyle(color: Colors.grey[600])),
+                  Text('Error Detail: ${_videoFiles[0].path}', style: TextStyle(color: Colors.grey[600])),
+                  SizedBox(height: 10),
+                  Row( // Use a Row widget for horizontal alignment
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton(
+                        onPressed: _rescanFolder,
+                        child: Text('Re-scan'),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 10), // Add spacing between the buttons
+                      ElevatedButton(
+                        onPressed: _rescanFolder,
+                        child: Text('Delete'),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.redAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

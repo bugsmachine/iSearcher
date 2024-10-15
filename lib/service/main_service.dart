@@ -91,8 +91,9 @@ Future<void> writeDataToFile(String path, String fileName, String data) async {
 Future<List<VideoFile>> readVideoFiles(String path) async {
   final Directory filmsDir = Directory(path);
   if (!filmsDir.existsSync()) {
-    print("Directory does not exist: $path");
-    return []; // Return an empty list if the directory does not exist
+    print("No such file or directory");
+
+    return[VideoFile(name: "F01", path: "No such file or directory", size: -9999, lastModified: DateTime.now())];
   }
 
   const List<String> videoExtensions = [
@@ -223,5 +224,7 @@ Future<void> _getVideoFilesRecursively(Directory dir, List<VideoFile> videoFiles
     }
   } catch (e) {
     print("Error reading directory ${dir.path}: $e");
+    // if exception is folder not found, clean the videoFiles add the exception code f01 to the list
+
   }
 }
