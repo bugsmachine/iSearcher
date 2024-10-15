@@ -9,7 +9,7 @@ Future<void> initDatabase() async {
   print("initDatabase");
   db = await openDatabase(
     join(await getDatabasesPath(), 'movies_database.db'),
-    version: 25, // Increment the version number
+    version: 31, // Increment the version number
     onCreate: (db, version) {
       print("onCreate");
       return db.transaction((txn) async {
@@ -115,6 +115,7 @@ Future<void> initDatabase() async {
         // add a default row value in config with ID "search_engine"
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('search_engine', 'https://www.google.com');''');
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('platform', 'null2');''');
+        await txn.execute('''INSERT INTO Config(id, value) VALUES ('last_write_config_time', 'en');''');
         // Indexes for efficient searching
         await txn.execute('CREATE INDEX idx_keyword_id ON MovieKeywords(keyword_id)');
         await txn.execute('CREATE INDEX idx_movie_id ON MovieKeywords(movie_id)');
@@ -194,6 +195,12 @@ Future<void> printAllKeywords() async {
   }
 }
 
+// Load all the data from user_default table, ordered by the actual time, the newest first
+Future<List<Map<String, dynamic>>> loadAllUserDefaultDESCInTime() async {
+  print("loadAllUserDefault");
+  return await db.query('UserDefault', orderBy: 'datetime(last_db_modified) DESC');
+}
+
 // get the film_folder of row 1 from table UserDefault, if not exist return null
 Future<String?> getUserDefaultOfLine1(String key) async {
   print("getUserDefaultOfLine1");
@@ -226,15 +233,15 @@ Future<void> setUserDefaultOfLine1(String bookMark, String filmFolder) async {
 Future<void> addNewUserDefault(String bookMark, String filmFolder) async {
   print("addNewUserDefault");
   await db.insert('UserDefault', {'bookMarks': bookMark, 'films_folder': filmFolder, 'last_db_modified': DateTime.now().toIso8601String()});
-  // String writeFilePath = '$filmFolder/config';
-  // String data = '''
-  // {
-  //   "bookMarks": "$bookMark",
-  //   "films_folder": "$filmFolder",
-  //   "last_db_modified": "${DateTime.now().toIso8601String()}"
-  // },
-  // ''';
-  // writeDataToFile(filmFolder, "user_default.txt", data);
+  //append the new data to the file
+  String data = '''
+  {
+    "bookMarks": "$bookMark",
+    "films_folder": "$filmFolder",
+    "last_db_modified": "${DateTime.now().toIso8601String()}"
+  },
+  ''';
+  writeDataToFile(filmFolder, "user_default.txt", data);
 }
 
 
@@ -281,4 +288,5 @@ Future<List<Map<String, dynamic>>> searchMoviesByKeyword(String keyword) async {
     WHERE Keywords.keyword = ?
   ''', [keyword]);
 }
+
 

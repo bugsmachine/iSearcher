@@ -26,6 +26,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   String? _modalErrorMessage;
   String? _platform;
 
+  // a map to hold the options and their values, default is 'All Folder': 'All Folder'
+  Map<String, String> _optionsMap = {'All Folder': 'All Folder'};
+  List<Map<String, dynamic>> _allFilmsFolder = [];
+
   List<TextEditingController> _tagControllers = [];
   TextEditingController filmNameController = TextEditingController();
   TextEditingController categoryController = TextEditingController();
@@ -49,6 +53,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     List<String> categories = await getCategories();
     String engine = await getConfig('search_engine');
     print("engine: $engine");
+
+    //load the folders
     setState(() {
       _platform = platform;
 
@@ -62,18 +68,32 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
   Future<void> _loadFilmsFolder() async {
-
     final secureBookmarks = SecureBookmarks();
-    final bookmark = await getUserDefaultOfLine1('bookMarks');
+    List <Map<String,dynamic>> allFilmFolder = await loadAllUserDefaultDESCInTime();
+    print("allFilmFolder: $allFilmFolder");
+    String? bookmark;
+    setState(() {
+      _allFilmsFolder = allFilmFolder;
+      for (var folder in _allFilmsFolder) {
+        String fileFolder = folder['films_folder'];
+        String lastFolder = fileFolder.split(Platform.pathSeparator).last;
+        // add only if the folder is not already in the options
+        if (!_options.contains(lastFolder) && lastFolder != 'null1') {
+          _options.add(lastFolder);
+          _optionsMap[lastFolder] = fileFolder;
+        }
+      }
+      print("options: $_options");
+    });
+    bookmark = _allFilmsFolder[0]['bookMarks'];
     if (bookmark == "bookmark_placeholder") {
-      final folder = await getUserDefaultOfLine1('films_folder');
+      final folder = _allFilmsFolder[0]['films_folder'];
       print("folder: $folder");
       String? lastFolder = folder?.split('\\').last;
       print("lastFolder: $lastFolder");
 
       setState(() {
         _selectedOption = lastFolder;
-        _options.add(lastFolder!);
         _filmsFolder = folder;
         _isLoading = true;
       });
@@ -92,8 +112,6 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
       setState(() {
         _selectedOption = lastFolder;
-        _options.add(lastFolder);
-
       });
 
       await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
@@ -117,20 +135,37 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     }
   }
 
+  Future<void> _loadAllVideoFiles() async {
+    List<VideoFile> allList = [];
+    for(var option in _optionsMap.entries){
+      _filmsFolder = option.value;
+      List<VideoFile> list = await readVideoFiles(_filmsFolder!);
+      allList.addAll(list);
+    }
+    setState(() {
+      _videoFiles = allList;
+    });
+  }
+
   Future<void> _loadVideoFiles() async {
     List<VideoFile> list = await readVideoFiles(_filmsFolder!);
-    // for (var videoFile in list) {
-    //   print('Video File: ${videoFile.name}');
-    // }
+
     setState(() {
       _videoFiles = list;
     });
   }
 
-  void _onDropdownChanged(String? newValue) {
+  Future<void> _onDropdownChanged(String? newValue) async {
     setState(() {
       _selectedOption = newValue;
     });
+    if (newValue == 'All Folder') {
+      _filmsFolder = "All Folder";
+      await _loadAllVideoFiles();
+    }else{
+      _filmsFolder = _optionsMap[newValue];
+      await _loadVideoFiles();
+    }
     print("Selected: $_selectedOption");
   }
 
@@ -143,6 +178,48 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _addFolder() async{
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory != null) {
+      if(_platform == 'macos'){
+        final secureBookmarks = SecureBookmarks();
+        final directory = Directory(selectedDirectory);
+        try {
+          final bookmark = await secureBookmarks.bookmark(directory);
+          await appConfigInit(selectedDirectory);
+          if(_filmsFolder == 'null1'){
+            await setUserDefaultOfLine1(bookmark, selectedDirectory);
+          }else{
+            await addNewUserDefault(bookmark, selectedDirectory);
+          }
+          await _loadFilmsFolder();
+        } catch (e) {
+          print('Error creating bookmark: $e');
+        }
+      }else{
+        // For Windows
+        try {
+          // Get last folder name
+          List<String> folders = selectedDirectory.split('\\'); // Use Windows path separator
+          String lastFolder = folders[folders.length - 1];
+          setState(() {
+            _filmsFolder = selectedDirectory;
+            _selectedOption = lastFolder;
+            _options.add(lastFolder);
+            _isLoading = true;
+          });
+          await setUserDefaultOfLine1("bookmark_placeholder", selectedDirectory);
+          await _loadVideoFiles();
+          setState(() {
+            _isLoading = false;
+          });
+        } catch (e) {
+          print('Error handling directory: $e');
+        }
+      }
     }
   }
 
@@ -162,35 +239,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               IconButton(
                 icon: Icon(Icons.add),
                 onPressed: () async {
-                  String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-                  if (selectedDirectory != null) {
-                    if(_platform == 'macos'){
-                      final secureBookmarks = SecureBookmarks();
-                      final directory = Directory(selectedDirectory);
-                      try {
-                        final bookmark = await secureBookmarks.bookmark(directory);
-                        await setUserDefaultOfLine1(bookmark, selectedDirectory);
-                        setState(() {
-                          _filmsFolder = selectedDirectory;
-                          _isLoading = true;
-                        });
-                        await _loadVideoFiles();
-                        setState(() {
-                          _isLoading = false;
-                        });
-                      } catch (e) {
-                        print('Error creating bookmark: $e');
-                      }
-                    }else{
-                      print("Platform not supported");
-                    }
-                  }
+                  await _addFolder();
                 },
               ),
               IconButton(
                 icon: Icon(Icons.settings),
                 onPressed: () {
-                  print("setting icon clicked");
+                  // open the custom modal to manage the file folders can delete or add new
                 },
               ),
             ],
@@ -208,54 +263,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 ? Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-                  if (selectedDirectory != null) {
-                    print(_platform);
-                    if (_platform == 'macos') {
-                      // Handle macOS with SecureBookmarks
-                      final secureBookmarks = SecureBookmarks();
-                      final directory = Directory(selectedDirectory);
-                      try {
-                        final bookmark = await secureBookmarks.bookmark(directory);
-                        await setUserDefaultOfLine1(bookmark, selectedDirectory);
-                        // Get last folder name
-                        List<String> folders = selectedDirectory.split('/');
-                        String lastFolder = folders[folders.length - 1];
-                        setState(() {
-                          _filmsFolder = selectedDirectory;
-                          _selectedOption = lastFolder;
-                          _options.add(lastFolder);
-                          _isLoading = true;
-                        });
-                        await _loadVideoFiles();
-                        setState(() {
-                          _isLoading = false;
-                        });
-                      } catch (e) {
-                        print('Error creating bookmark: $e');
-                      }
-                    } else {
-                      // For Windows
-                      try {
-                        // Get last folder name
-                        List<String> folders = selectedDirectory.split('\\'); // Use Windows path separator
-                        String lastFolder = folders[folders.length - 1];
-                        setState(() {
-                          _filmsFolder = selectedDirectory;
-                          _selectedOption = lastFolder;
-                          _options.add(lastFolder);
-                          _isLoading = true;
-                        });
-                        await setUserDefaultOfLine1("bookmark_placeholder", selectedDirectory);
-                        await _loadVideoFiles();
-                        setState(() {
-                          _isLoading = false;
-                        });
-                      } catch (e) {
-                        print('Error handling directory: $e');
-                      }
-                    }
-                  }
+                  await _addFolder();
                 },
 
                 child: Text('Select Folder'),

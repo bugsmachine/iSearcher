@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../models/video_file.dart'; // Import the VideoFile model
+import '../repository/db.dart'; // Import the database helper functions
 
 
 Future<void> appConfigInit(String path) async {
@@ -7,60 +8,68 @@ Future<void> appConfigInit(String path) async {
   final Directory configDir = Directory('$path/config');
   if (!configDir.existsSync()) {
     configDir.createSync();
-  }
 
-  final Directory recordedFilmsDir = Directory('$path/recorded_films');
-  if (!recordedFilmsDir.existsSync()) {
-    recordedFilmsDir.createSync();
-  }
+    final Directory recordedFilmsDir = Directory('$path/recorded_films');
+    if (!recordedFilmsDir.existsSync()) {
+      recordedFilmsDir.createSync();
+    }
 
-  // Create a file in the 'config' directory called 'app_config.txt'
-  final File configFile = File('$path/config/app_config.txt');
-  if (!configFile.existsSync()) {
-    configFile.createSync();
-  }
+    // Create a file in the 'config' directory called 'app_config.txt'
+    final File configFile = File('$path/config/app_config.txt');
+    if (!configFile.existsSync()) {
+      configFile.createSync();
+    }
 
-  // Write the default configuration to the file
-  // get the current time and write it to the file
-  DateTime now = DateTime.now();
-  configFile.writeAsStringSync('''
+    // Write the default configuration to the file
+    // get the current time and write it to the file
+    DateTime now = DateTime.now();
+    configFile.writeAsStringSync('''
   {
     "last_db_modified": "${now.toIso8601String()}",
     "language": "en"
   }
   ''');
 
-  // create a text file for each table in the database
-  final File categoriesFile = File('$path/config/categories.txt');
-  if (!categoriesFile.existsSync()) {
-    categoriesFile.createSync();
-  }
+    // create a text file for each table in the database
+    final File categoriesFile = File('$path/config/categories.txt');
+    if (!categoriesFile.existsSync()) {
+      categoriesFile.createSync();
+    }
 
-  final File keywordsFile = File('$path/config/keywords.txt');
-  if (!keywordsFile.existsSync()) {
-    keywordsFile.createSync();
-  }
+    final File keywordsFile = File('$path/config/keywords.txt');
+    if (!keywordsFile.existsSync()) {
+      keywordsFile.createSync();
+    }
 
-  final File moviesFile = File('$path/config/movies.txt');
-  if (!moviesFile.existsSync()) {
-    moviesFile.createSync();
-  }
+    final File moviesFile = File('$path/config/movies.txt');
+    if (!moviesFile.existsSync()) {
+      moviesFile.createSync();
+    }
 
-  final File movieKeywordsFile = File('$path/config/movie_keywords.txt');
-  if (!movieKeywordsFile.existsSync()) {
-    movieKeywordsFile.createSync();
-  }
+    final File movieKeywordsFile = File('$path/config/movie_keywords.txt');
+    if (!movieKeywordsFile.existsSync()) {
+      movieKeywordsFile.createSync();
+    }
 
-  final File userDefaultFile = File('$path/config/user_default.txt');
-  if (!userDefaultFile.existsSync()) {
-    userDefaultFile.createSync();
-  }
+    final File userDefaultFile = File('$path/config/user_default.txt');
+    if (!userDefaultFile.existsSync()) {
+      userDefaultFile.createSync();
+    }
 
-  final File configTableFile = File('$path/config/config.txt');
-  if (!configTableFile.existsSync()) {
-    configTableFile.createSync();
-  }
+    final File configTableFile = File('$path/config/config.txt');
+    if (!configTableFile.existsSync()) {
+      configTableFile.createSync();
+    }
 
+    await updateConfig("last_write_config_time", now.toIso8601String());
+  }else{
+    print("config folder already exists");
+  }
+}
+
+// sync the database with the txt files
+Future<void> syncDatabase(String path) async {
+  String lastAPPWrite = await getConfig("last_write_config_time");
 }
 
 // write data to the txt file
@@ -69,13 +78,13 @@ Future<void> writeDataToFile(String path, String fileName, String data) async {
   if (!file.existsSync()) {
     file.createSync();
   }
-
   // Check if the file is empty
   if (file.lengthSync() == 0) {
     file.writeAsStringSync(data);
   } else {
     file.writeAsStringSync(data, mode: FileMode.append);
   }
+  await updateConfig("last_write_config_time", DateTime.now().toIso8601String());
 }
 
 // Read all the video files in the film_folder directory recursively and return a list of VideoFile objects

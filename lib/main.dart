@@ -37,10 +37,14 @@ void main(List<String> args) async {
       titleBarStyle: TitleBarStyle.hidden,
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
+      // control windows size
+      await windowManager.setSize(const Size(1100, 700));
+      await windowManager.setPosition(const Offset(230, 120));
       await windowManager.show();
       await windowManager.focus();
     });
   }
+
 
 
 
@@ -66,6 +70,8 @@ void main(List<String> args) async {
     }
   });
 }
+
+
 
 Future<void> openSettingsWindow() async {
   final window = await DesktopMultiWindow.createWindow(jsonEncode({
@@ -115,9 +121,15 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WindowListener {
   int _selectedIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void onWindowClose() {
+    // do something
+    print('Window closed');
+  }
 
   @override
   Widget build(BuildContext context) {
