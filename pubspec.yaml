@@ -30,12 +30,14 @@ environment:
 dependencies:
   sqflite: ^2.0.0+3
   bitsdojo_window: ^0.1.6
+  sqflite_common_ffi: ^2.0.0+3
   path: ^1.8.0
   window_manager: ^0.4.2
   desktop_multi_window: ^0.2.0
   file_picker: ^8.0.0+1
   macos_secure_bookmarks: ^0.2.1
   url_launcher: ^6.0.20
+  win32: ^5.2.0
   flutter:
     sdk: flutter
 
