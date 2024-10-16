@@ -74,6 +74,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     String? bookmark;
     setState(() {
       _allFilmsFolder = allFilmFolder;
+      print("allFilmsFolder: $_allFilmsFolder");
       for (var folder in _allFilmsFolder) {
         String fileFolder = folder['films_folder'];
         String lastFolder = fileFolder.split(Platform.pathSeparator).last;
@@ -135,7 +136,22 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     }
   }
 
-  Future<void> _loadAllVideoFiles() async {
+  Future<void> _loadAllVideoFilesWindows() async {
+    List<VideoFile> allList = [];
+    for (var option in _optionsMap.entries) {
+      if(option.key != 'All Folder'){
+        _filmsFolder = option.value[0];
+        List<VideoFile> list = await readVideoFiles(_filmsFolder!);
+        allList.addAll(list);
+      }
+    }
+    setState(() {
+      _videoFiles = allList;
+    });
+  }
+
+
+  Future<void> _loadAllVideoFilesMacOS() async {
     final secureBookmarks = SecureBookmarks();
     List<VideoFile> allList = [];
     for (var option in _optionsMap.entries) {
@@ -172,17 +188,27 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     });
     if (newValue == 'All Folder') {
       _filmsFolder = "All Folder";
-      await _loadAllVideoFiles();
-    }else{
-      _filmsFolder = _optionsMap[newValue]?[0];
-      String? bookmark = _optionsMap[newValue]?[1];
-      final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
-      await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
-      try{
-        await _loadVideoFiles();
-      }finally{
-        await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+      if(_platform == 'macos') {
+        await _loadAllVideoFilesMacOS();
+      }else{
+        await _loadAllVideoFilesWindows();
       }
+    }else{
+      if(_platform == 'macos'){
+        _filmsFolder = _optionsMap[newValue]?[0];
+        String? bookmark = _optionsMap[newValue]?[1];
+        final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
+        await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+        try{
+          await _loadVideoFiles();
+        }finally{
+          await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+        }
+      }else{
+        _filmsFolder = _optionsMap[newValue]?[0];
+        await _loadVideoFiles();
+      }
+
     }
     print("Selected: $_selectedOption");
   }
@@ -191,13 +217,21 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
   Future<void> _rescanFolder() async {
     if (_filmsFolder != null) {
-      setState(() {
-        _isLoading = true;
-      });
-      await _loadVideoFiles();
-      setState(() {
-        _isLoading = false;
-      });
+      if(_selectedOption == 'All Folder'){
+        if(_platform == 'macos') {
+          await _loadAllVideoFilesMacOS();
+        }else{
+          await _loadAllVideoFilesWindows();
+        }
+      }else{
+        setState(() {
+          _isLoading = true;
+        });
+        await _loadVideoFiles();
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -227,8 +261,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
             _isLoading = true;
           });
           await appConfigInit(selectedDirectory);
-          await setUserDefaultOfLine1("bookmark_placeholder", selectedDirectory);
-          _loadFilmsFolder();
+          if(_filmsFolder == 'null1'){
+            await setUserDefaultOfLine1("bookmark_placeholder", selectedDirectory);
+          }else{
+            await addNewUserDefault("bookmark_placeholder", selectedDirectory);
+          }
+          await _loadFilmsFolder();
           setState(() {
             _isLoading = false;
           });

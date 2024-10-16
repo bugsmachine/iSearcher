@@ -6,6 +6,7 @@ import 'package:home_cinema_app/view/all_movies_view.dart';
 import 'package:home_cinema_app/view/unrecorded_films_view.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/services.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
 import 'repository/db.dart';
 import 'service/main_service.dart';
@@ -15,6 +16,13 @@ import 'view/settings.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // IGNORE THIS IN MACOS
+  // Initialize FFI
+  sqfliteFfiInit();
+
+  // Set the database factory
+  databaseFactory = databaseFactoryFfi;
 
   if (args.isNotEmpty && args.first == 'multi_window') {
     final windowId = int.parse(args[1]);
