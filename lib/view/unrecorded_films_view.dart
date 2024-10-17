@@ -491,7 +491,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
 
-  void _showEditFilmDetailsModal(BuildContext context, VideoFile videoFile) {
+  Future<void> _showEditFilmDetailsModal(BuildContext context, VideoFile videoFile) async {
     String imagePath = '';
     GlobalKey<State> modalKey = GlobalKey<State>();
     tagFields.add(_buildTagField(0, modalKey));
@@ -507,9 +507,21 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     tagFields.add(_buildTagField(0, modalKey));
     _tagControllers.add(TextEditingController());
 
-    print(predictMovieDetail(videoFile.name).then(
-            (value) => print(value)
-    ));
+    Map<String, String?> movieInfo = await predictMovieDetail(videoFile.name);
+    for(var key in movieInfo.keys){
+      if (key == "err") {
+        print("Error predicting movie detail");
+      }else if (key == "title") {
+        filmName = movieInfo[key]!;
+        filmNameController.text = filmName;
+      }else if (key == "posterUrl") {
+        imagePath = movieInfo[key]!;
+        print("imagePath: $imagePath");
+        setState(() {
+          coverImg = imagePath;
+        });
+      }
+    }
 
 
     CustomModal.show(
@@ -836,12 +848,15 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   ),
                                 ],
                               )
-                                  : FutureBuilder(
-                                future: File(imagePath).exists(),
+                              :FutureBuilder(
+                                future: imagePath.contains('http')
+                                    ? Future.value(true)
+                                    : File(imagePath).exists(),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
                                     return Center(child: CircularProgressIndicator());
-                                  } else if (snapshot.hasError || !snapshot.data!) {
+                                  } else if (snapshot.hasError ||
+                                      (!snapshot.data! && !imagePath.contains('http'))) {
                                     return Center(child: Text('File does not exist'));
                                   } else {
                                     return Container(
@@ -849,7 +864,29 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                       height: 250,
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(8),
-                                        child: Image.file(
+                                        child: imagePath.contains('http')
+                                            ? Image.network(
+                                          imagePath,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Center(
+                                              child: CircularProgressIndicator(
+                                                value: loadingProgress.expectedTotalBytes != null
+                                                    ? loadingProgress.cumulativeBytesLoaded /
+                                                    (loadingProgress.expectedTotalBytes ?? 1)
+                                                    : null,
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) {
+                                            print(error);
+                                            return Center(child: Text('Failed to load image'));
+                                          },
+                                        )
+                                            : Image.file(
                                           File(imagePath),
                                           fit: BoxFit.cover,
                                           width: double.infinity,

@@ -38,6 +38,7 @@ dependencies:
   macos_secure_bookmarks: ^0.2.1
   url_launcher: ^6.0.20
   win32: ^5.6.0
+  cached_network_image: ^3.2.0
   http: ^1.2.2
   flutter:
     sdk: flutter

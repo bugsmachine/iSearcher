@@ -147,6 +147,9 @@ class _SettingsWindowState extends State<SettingsWindow> {
         ),
         SizedBox(height: 16),
         // Add other settings here, each in a new row
+        // show a img from https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg
+
+        Image.network('https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg'),
       ],
     );
   }

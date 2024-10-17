@@ -80,7 +80,7 @@ Future<String> fetchMoviePoster(String movieTitle) async {
     if (data['results'] != null && data['results'].length > 0) {
       // Get the poster path
       final posterPath = data['results'][0]['poster_path'];
-      return 'http://image.tmdb.org/t/p/w500$posterPath';
+      return 'https://image.tmdb.org/t/p/w500$posterPath';
     } else {
       // No poster found, return error image
       return 'https://via.placeholder.com/500?text=No+Poster+Found';
