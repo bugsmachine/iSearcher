@@ -445,22 +445,31 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                             IconButton(
                               icon: Icon(Icons.play_circle_outline_outlined, color: Colors.blue),
                               onPressed: () async {
-                                final secureBookmarks = SecureBookmarks();
-                                String? bookmark = _optionsMap[_selectedOption]?[1];
-                                final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
-                                await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
-                                final videoPath = videoFile.path;
-                                final Uri videoUri = Uri.file(videoPath);
-                                try{
+                                if (_platform == "macos"){
+                                  final secureBookmarks = SecureBookmarks();
+                                  String? bookmark = _optionsMap[_selectedOption]?[1];
+                                  final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
+                                  await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+                                  final videoPath = videoFile.path;
+                                  final Uri videoUri = Uri.file(videoPath);
+                                  try{
+                                    if (await canLaunchUrl(videoUri)) {
+                                      await launchUrl(videoUri);
+                                    } else {
+                                      print('Could not launch $videoPath');
+                                    }
+                                  }finally{
+                                    await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+                                  }
+                                }else{
+                                  final videoPath = videoFile.path;
+                                  final Uri videoUri = Uri.file(videoPath);
                                   if (await canLaunchUrl(videoUri)) {
                                     await launchUrl(videoUri);
                                   } else {
                                     print('Could not launch $videoPath');
                                   }
-                                }finally{
-                                  await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
                                 }
-
                               },
                             ),
                             SizedBox(width: 28),
