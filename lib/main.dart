@@ -18,11 +18,11 @@ void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // IGNORE THIS IN MACOS
-  // Initialize FFI
-  sqfliteFfiInit();
-
-  // Set the database factory
-  databaseFactory = databaseFactoryFfi;
+  // // Initialize FFI
+  // sqfliteFfiInit();
+  //
+  // // Set the database factory
+  // databaseFactory = databaseFactoryFfi;
 
   if (args.isNotEmpty && args.first == 'multi_window') {
     final windowId = int.parse(args[1]);

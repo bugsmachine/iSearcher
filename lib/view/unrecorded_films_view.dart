@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:home_cinema_app/service/main_service.dart';
+import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import '../component/inner_top_bar.dart';
 import '../repository/db.dart';
 import '../models/video_file.dart';
@@ -49,10 +50,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
   Future<void> _loadOther() async{
     String platform = await getConfig('platform');
-    print("platform: $platform");
+    // print("platform: $platform");
     List<String> categories = await getCategories();
     String engine = await getConfig('search_engine');
-    print("engine: $engine");
+    // print("engine: $engine");
 
     //load the folders
     setState(() {
@@ -74,7 +75,6 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     String? bookmark;
     setState(() {
       _allFilmsFolder = allFilmFolder;
-      print("allFilmsFolder: $_allFilmsFolder");
       for (var folder in _allFilmsFolder) {
         String fileFolder = folder['films_folder'];
         String lastFolder = fileFolder.split(Platform.pathSeparator).last;
@@ -89,9 +89,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     bookmark = _allFilmsFolder[0]['bookMarks'];
     if (bookmark == "bookmark_placeholder") {
       final folder = _allFilmsFolder[0]['films_folder'];
-      print("folder: $folder");
+      // print("folder: $folder");
       String? lastFolder = folder?.split('\\').last;
-      print("lastFolder: $lastFolder");
+      // print("lastFolder: $lastFolder");
 
       setState(() {
         _selectedOption = lastFolder;
@@ -340,7 +340,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 ],
               ),
             )
-                : _videoFiles.isEmpty
+                : _videoFiles[0].name == "F02"
                 ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -483,8 +483,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     tagFields.add(_buildTagField(0, modalKey));
     _tagControllers.add(TextEditingController());
 
-    extractVideoDetails(videoFile.name).forEach((key, value) {
-      print('$key: $value');
+    predictMovieDetail(videoFile.name).forEach((key, value) {
+      print("$key: $value");
     });
 
 

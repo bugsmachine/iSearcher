@@ -48,18 +48,30 @@ class InnerTopBar extends StatelessWidget {
         color: Colors.white,
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: selectedOption,
-          icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
-          dropdownColor: Colors.white,
-          style: TextStyle(color: Colors.black, fontSize: 14),
-          items: options.map((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
-          onChanged: onChanged,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 200), // Set the max width to 200
+          child: DropdownButton<String>(
+            isExpanded: true, // Allow DropdownButton to take full width of 200
+            value: selectedOption,
+            icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
+            dropdownColor: Colors.white,
+            style: TextStyle(color: Colors.black, fontSize: 14),
+            items: options.map((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Tooltip(
+                  message: value, // Show full text on hover
+                  waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
+                  child: Text(
+                    value,
+                    overflow: TextOverflow.ellipsis, // Truncate long text
+                    maxLines: 1, // Keep text to a single line
+                  ),
+                ),
+              );
+            }).toList(),
+            onChanged: onChanged,
+          ),
         ),
       ),
     );

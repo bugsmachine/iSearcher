@@ -9,7 +9,7 @@ import bitsdojo_window_macos
 import desktop_multi_window
 import macos_secure_bookmarks
 import screen_retriever
-import sqflite_darwin
+import sqflite
 import url_launcher_macos
 import window_manager
 

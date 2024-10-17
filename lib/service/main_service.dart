@@ -116,84 +116,12 @@ Future<List<VideoFile>> readVideoFiles(String path) async {
   //   print('Name: ${videoFile.name}, Path: ${videoFile.path}, Size: ${videoFile.size}, Last Modified: ${videoFile.lastModified}');
   // }
 
-  return videoFiles; // Return the list of video files
-}
-
-Map<String, String?> extractVideoDetails(String filename) {
-  // Define regex patterns
-  final yearPattern = RegExp(r"\b(19|20)\d{2}\b");
-  final resolutionPattern = RegExp(r"\b(2160p|1080p|720p|4k)\b");
-  final sourcePattern = RegExp(r"(BluRay|WEB-DL|REMUX|HDRip|UHD|WEBRip)", caseSensitive: false);
-  final audioPattern = RegExp(r"(Atmos|DTS-HD|TrueHD|DDP|DD|7\.1|5\.1)", caseSensitive: false);
-
-  // Extract parts using regex
-  final yearMatch = yearPattern.firstMatch(filename);
-  final resolutionMatch = resolutionPattern.firstMatch(filename);
-  final sourceMatches = sourcePattern.allMatches(filename);
-  final audioMatches = audioPattern.allMatches(filename);
-
-  // Process title
-  String? title = cleanTitle(filename);
-
-  // Convert sources to a readable format
-  List<String> sources = sourceMatches.map((match) => match.group(0)!.toLowerCase()).toList();
-  if (sources.contains('remux')) {
-    sources.remove('remux');
-    sources.add('Remux');
+  if (videoFiles.isEmpty) {
+    print("No video files found in the film_folder directory");
+    return[VideoFile(name: "F02", path: "No video files found in the directory", size: -9999, lastModified: DateTime.now())];
   }
-  String sourceFormatted = sources.map((source) => capitalizeFirstLetter(source)).join(', ');
 
-  // Extract primary audio formats (just check if Atmos exists)
-  String audioFormats = audioMatches.any((match) => match.group(0)!.toLowerCase() == 'atmos')
-      ? 'Atmos'
-      : 'Not Atmos';
-
-  // Prepare the parsed data
-  return {
-    'title': title,
-    'year': yearMatch != null ? yearMatch.group(0) : null,
-    'resolution': resolutionMatch != null ? resolutionMatch.group(0) : null,
-    'source': sourceFormatted,
-    'audio': audioFormats,
-  };
-}
-
-String? cleanTitle(String filename) {
-  // Remove file extension
-  String nameWithoutExtension = filename.replaceAll(RegExp(r'\.[^\.]+$'), '');
-
-  // Remove common patterns that are not part of the title
-  final removePattern = RegExp(
-      r'\b(19|20)\d{2}\b|'  // Year
-      r'\b(2160p|1080p|720p|4k)\b|'  // Resolution
-      r'\b(BluRay|WEB-DL|REMUX|HDRip|UHD|WEBRip)\b|'  // Source
-      r'\b(Atmos|DTS-HD|TrueHD|DDP\d?|DD\d?|[57]\.1)\b|'  // Audio
-      r'\b(x264|x265|HEVC|10bit|HDR|DoVi|SDR)\b|'  // Encoding
-      r'\b(PROPER|REPACK|IMAX|Extended|Edition|Cut)\b|'  // Other common terms
-      r'[-\.]v\d|'  // Version numbers like .v2 or -v3
-      r'\b[a-zA-Z0-9]{2,8}\b$|'  // Release group at the end
-      r'\bMA\b|'  // MA (possibly for Master Audio)
-      r'\b\d+Audio\b|'  // Audio channel count (e.g., 2Audio)
-      r'\bTrueHD\d+\s*\d*\b',  // TrueHD followed by numbers
-      caseSensitive: false
-  );
-
-  String cleanedTitle = nameWithoutExtension.replaceAll(removePattern, ' ');
-
-  // Replace separators with spaces
-  cleanedTitle = cleanedTitle.replaceAll(RegExp(r'[\.\_\-]+'), ' ');
-
-  // Remove multiple spaces and trim
-  cleanedTitle = cleanedTitle.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-  // Capitalize the first letter of each word
-  cleanedTitle = cleanedTitle.split(' ').map((word) => capitalizeFirstLetter(word)).join(' ');
-
-  return cleanedTitle;
-}
-
-String capitalizeFirstLetter(String word) {
-  return word.isNotEmpty ? word[0].toUpperCase() + word.substring(1).toLowerCase() : word;
+  return videoFiles; // Return the list of video files
 }
 
 
