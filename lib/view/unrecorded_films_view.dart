@@ -444,8 +444,23 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                             // Add a Play button here
                             IconButton(
                               icon: Icon(Icons.play_circle_outline_outlined, color: Colors.blue),
-                              onPressed: () {
-                                print('Playing: ${videoFile.path}');  // Print the file path
+                              onPressed: () async {
+                                final secureBookmarks = SecureBookmarks();
+                                String? bookmark = _optionsMap[_selectedOption]?[1];
+                                final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
+                                await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+                                final videoPath = videoFile.path;
+                                final Uri videoUri = Uri.file(videoPath);
+                                try{
+                                  if (await canLaunchUrl(videoUri)) {
+                                    await launchUrl(videoUri);
+                                  } else {
+                                    print('Could not launch $videoPath');
+                                  }
+                                }finally{
+                                  await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+                                }
+
                               },
                             ),
                             SizedBox(width: 28),
@@ -483,9 +498,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     tagFields.add(_buildTagField(0, modalKey));
     _tagControllers.add(TextEditingController());
 
-    predictMovieDetail(videoFile.name).forEach((key, value) {
-      print("$key: $value");
-    });
+    print(predictMovieDetail(videoFile.name).then(
+            (value) => print(value)
+    ));
 
 
     CustomModal.show(

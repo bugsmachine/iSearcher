@@ -2,7 +2,7 @@ import Cocoa
 import FlutterMacOS
 import Sparkle
 
-@NSApplicationMain
+@main
 class AppDelegate: FlutterAppDelegate {
     // Add the Sparkle updater controller
     let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)

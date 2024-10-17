@@ -1,5 +1,7 @@
-Map<String, String?> predictMovieDetail(String movieName) {
-  // Sample movie name: "Avengers.Endgame.2019.PROPER.2160p.BluRay.REMUX.HEVC.DTS-HD.MA.TrueHD.7.1.Atmos-FGT.mkv"
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+Future<Map<String, String?>> predictMovieDetail(String movieName) async {
   List<String> movieInfo = movieName.split(".");
   int movieYearIndex = movieInfo.indexWhere((info) => RegExp(r'^\d{4}$').hasMatch(info));
 
@@ -12,7 +14,7 @@ Map<String, String?> predictMovieDetail(String movieName) {
   String season = "";
   String episode = "";
   Map<String, String> cleanedTitle = cleanTitle(title);
-  print(cleanedTitle);
+
   for (var key in cleanedTitle.keys) {
     if (key == "volume") {
       volume = cleanedTitle[key]!;
@@ -20,12 +22,10 @@ Map<String, String?> predictMovieDetail(String movieName) {
       season = cleanedTitle[key]!;
     } else if (key == "episode") {
       episode = cleanedTitle[key]!;
-    }else{
+    } else {
       title = cleanedTitle[key]!;
     }
   }
-
-
 
   String year = movieInfo[movieYearIndex];
 
@@ -42,6 +42,18 @@ Map<String, String?> predictMovieDetail(String movieName) {
   bool isAtmos = movieName.toLowerCase().contains("atmos");
   bool isINT = movieName.toLowerCase().contains("ctrlhd");
 
+
+  String searchTitle = title;
+  if (season != "") {
+    searchTitle += " season $season";
+  }else if(volume != ""){
+    searchTitle += " Vol. $volume";
+  }
+
+  print(searchTitle);
+  // Fetch movie poster
+  String posterUrl = await fetchMoviePoster(searchTitle);
+
   return {
     'title': title,
     'volume': volume,
@@ -52,10 +64,32 @@ Map<String, String?> predictMovieDetail(String movieName) {
     'isRemux': isRemux.toString(),
     'isBluRay': isBluRay.toString(),
     'isAtmos': isAtmos.toString(),
-    'isINT': isINT.toString()
+    'isINT': isINT.toString(),
+    'posterUrl': posterUrl
   };
 }
 
+Future<String> fetchMoviePoster(String movieTitle) async {
+  final apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+  final url = Uri.parse('https://api.themoviedb.org/3/search/movie?api_key=$apiKey&query=$movieTitle');
+
+  final response = await http.get(url);
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    if (data['results'] != null && data['results'].length > 0) {
+      // Get the poster path
+      final posterPath = data['results'][0]['poster_path'];
+      return 'http://image.tmdb.org/t/p/w500$posterPath';
+    } else {
+      // No poster found, return error image
+      return 'https://via.placeholder.com/500?text=No+Poster+Found';
+    }
+  } else {
+    // Error during the API call, return error image
+    return 'https://via.placeholder.com/500?text=Error+Fetching+Poster';
+  }
+}
 
 Map<String, String> cleanTitle(String title) {
   RegExp volPattern = RegExp(r'vol\s*\d+', caseSensitive: false);
