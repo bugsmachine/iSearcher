@@ -14,21 +14,96 @@ class MainFlutterWindow: NSWindow {
       let getImgChannel = FlutterMethodChannel(
             name: "image_download_channel",
             binaryMessenger: flutterViewController.engine.binaryMessenger)
-          getImgChannel.setMethodCallHandler { (call, result) in
-              if call.method == "getImage" {
-                              guard let args = call.arguments as? [String: Any],
-                                    let imageName = args["imageName"] as? String else {
-                                  result(FlutterError(code: "INVALID_ARGUMENT", message: "Invalid arguments", details: nil))
-                                  return
-                              }
-                  self.getIMG(imageName: imageName, result: result)
-                          }
+      
+      getImgChannel.setMethodCallHandler { (call, result) in
+          print("Method called: \(call.method)") // Add this debug print
+          if call.method == "getImage" {
+              // ... existing code ...
+              guard let args = call.arguments as? [String: Any],
+                    let imageName = args["imageName"] as? String else {
+                  result(FlutterError(code: "INVALID_ARGUMENT", message: "Invalid arguments", details: nil))
+                  return
+              }
+                self.getIMG(imageName: imageName, result: result)
+          } else if call.method == "info" {
+              print("getImageStorage method called") // Add this debug print
+              let info = self.getImgCacheInfo()
+              print("Info retrieved: \(info)") // Add this debug print
+              result(info)
+          }else if call.method == "ab"{
+              result("abc")
           }
+          else {
+              print("Unknown method called: \(call.method)") // More specific debug print
+              result(FlutterError(code: "UNKNOWN_METHOD", message: "Unknown method: \(call.method)", details: nil))
+          }
+      }
+    
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
     super.awakeFromNib()
   }
+    
+    func getImgCacheInfo() -> [String] {
+        // Get the Documents directory path dynamically
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        
+        // Append the Posters subdirectory to the path
+        let directoryPath = documentsDirectory.appendingPathComponent("Posters")
+        
+        // Initialize counters
+        var totalFiles = 0
+        var totalSize: Int64 = 0 // Size in bytes
+
+        // Check if the directory exists
+        if !FileManager.default.fileExists(atPath: directoryPath.path) {
+            return ["Directory does not exist", "0", "0 KB"] // Handle missing directory case
+        }
+
+        do {
+            // Get the list of files in the directory
+            let files = try FileManager.default.contentsOfDirectory(at: directoryPath, includingPropertiesForKeys: [.fileSizeKey], options: [])
+            
+            for file in files {
+                // Count each file and get its size
+                let fileAttributes = try file.resourceValues(forKeys: [.fileSizeKey])
+                if let fileSize = fileAttributes.fileSize {
+                    totalFiles += 1
+                    totalSize += Int64(fileSize) // Add file size
+                }
+            }
+        } catch {
+            print("Error reading directory: \(error.localizedDescription)")
+            return ["Error reading directory", "0", "0 KB"]
+        }
+        
+        // Convert totalSize to a more readable format (KB, MB, or GB)
+        let sizeFormatted = formatBytes(totalSize)
+
+        return ["Number of posters: \(totalFiles)", "Total size: \(sizeFormatted)"]
+    }
+
+    // Function to format bytes into KB, MB, GB
+    func formatBytes(_ bytes: Int64, decimals: Int = 2) -> String {
+        if bytes < 1024 { return "\(bytes) B" } // less than 1 KB
+        let kb: Int64 = 1024
+        let mb = kb * 1024
+        let gb = mb * 1024
+
+        let formatter = NumberFormatter()
+        formatter.maximumFractionDigits = decimals
+        formatter.minimumFractionDigits = 0
+        formatter.numberStyle = .decimal
+
+        if bytes < mb {
+            return formatter.string(from: NSNumber(value: Double(bytes) / Double(kb)))! + " KB"
+        } else if bytes < gb {
+            return formatter.string(from: NSNumber(value: Double(bytes) / Double(mb)))! + " MB"
+        } else {
+            return formatter.string(from: NSNumber(value: Double(bytes) / Double(gb)))! + " GB"
+        }
+    }
     
 
     // Method to download an image

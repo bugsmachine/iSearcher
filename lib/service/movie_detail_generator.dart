@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 import 'package:path_provider/path_provider.dart';
@@ -152,56 +153,16 @@ Future<void> fetchImageWithHeaders(String imageUrl) async {
   }
 }
 
-
-
-Future<List<String>> getImgCacheInfo() async {
-  // Get the Documents directory dynamically
-  Directory documentsDirectory = await getApplicationDocumentsDirectory();
-
-  // Append the Posters subdirectory to the path
-  final String directoryPath = '${documentsDirectory.path}/Posters';
-
-  // Directory object for the given path
-  final directory = Directory(directoryPath);
-
-  // Check if the directory exists
-  if (!await directory.exists()) {
-    return ['Directory does not exist', '0', '0 KB']; // Handle missing directory case
-  }
-
-  // Initialize counters
-  int totalFiles = 0;
-  int totalSize = 0; // Size in bytes
-
-  // Get the list of files in the directory
-  await for (var entity in directory.list(recursive: false, followLinks: false)) {
-    if (entity is File) {
-      totalFiles++; // Count each file
-      totalSize += await entity.length(); // Add file size
-    }
-  }
-
-  // Convert totalSize to a more readable format (KB, MB, or GB)
-  String sizeFormatted = _formatBytes(totalSize);
-
-  return ['Number of posters: $totalFiles', 'Total size: $sizeFormatted'];
+String getMacOSUsername() {
+  // Get the home directory path
+  String homeDirectory = Platform.environment['HOME'] ?? '';
+  print(homeDirectory);
+  // Extract the username from the home directory path, the second one in the list
+  String username = homeDirectory.split('/').elementAt(2);
+  return username;
 }
 
-// Function to format bytes into KB, MB, GB
-String _formatBytes(int bytes, [int decimals = 2]) {
-  if (bytes < 1024) return "$bytes B"; // less than 1 KB
-  const int kb = 1024;
-  const int mb = kb * 1024;
-  const int gb = mb * 1024;
 
-  if (bytes < mb) {
-    return (bytes / kb).toStringAsFixed(decimals) + ' KB';
-  } else if (bytes < gb) {
-    return (bytes / mb).toStringAsFixed(decimals) + ' MB';
-  } else {
-    return (bytes / gb).toStringAsFixed(decimals) + ' GB';
-  }
-}
 
 Future<void> cleanPosterCache() async {
 

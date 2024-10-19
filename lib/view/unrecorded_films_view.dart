@@ -76,7 +76,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   Future<void> _loadFilmsFolder() async {
     final secureBookmarks = SecureBookmarks();
     List <Map<String,dynamic>> allFilmFolder = await loadAllUserDefaultDESCInTime();
-    print("allFilmFolder: $allFilmFolder");
+    // print("allFilmFolder: $allFilmFolder");
     String? bookmark;
     setState(() {
       _allFilmsFolder = allFilmFolder;

@@ -1,7 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+// import the main.dart file
+import 'package:home_cinema_app/main.dart';
+import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class SettingsWindow extends StatefulWidget {
   @override
@@ -12,6 +17,73 @@ class _SettingsWindowState extends State<SettingsWindow> {
   String _selectedView = 'General'; // Default view
   String _selectedSearchEngine = 'Google'; // Move this here
   TextEditingController _customUrlController = TextEditingController(); // Move this here
+
+  ImageDownloader imageService = ImageDownloader();
+  List<String>? _imageStorageInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_selectedView == 'APP Storage') {
+      _fetchImageStorageInfo();
+    }
+  }
+
+  Future<void> _fetchImageStorageInfo() async {
+    List<String>? info = await getImgCacheInfo("caodingjie");
+    setState(() {
+      _imageStorageInfo = info;
+    });
+  }
+
+
+  Future<List<String>> getImgCacheInfo(String username) async {
+    // Get the Documents directory dynamically
+    // /Users/{username}/Library/Containers/top.homecinema.homeCinemaApp/Data/Documents/Posters
+
+    String directoryPath = '/Users/$username/Library/Containers/top.homecinema.homeCinemaApp/Data/Documents/Posters';
+
+    // Directory object for the given path
+    final directory = Directory(directoryPath);
+
+    // Check if the directory exists
+    if (!await directory.exists()) {
+      return ['Directory does not exist', '0', '0 KB']; // Handle missing directory case
+    }
+
+    // Initialize counters
+    int totalFiles = 0;
+    int totalSize = 0; // Size in bytes
+
+    // Get the list of files in the directory
+    await for (var entity in directory.list(recursive: false, followLinks: false)) {
+      if (entity is File) {
+        totalFiles++; // Count each file
+        totalSize += await entity.length(); // Add file size
+      }
+    }
+
+    // Convert totalSize to a more readable format (KB, MB, or GB)
+    String sizeFormatted = _formatBytes(totalSize);
+    print('Number of posters: $totalFiles');
+    return ['Number of posters: $totalFiles', 'Total size: $sizeFormatted'];
+  }
+
+// Function to format bytes into KB, MB, GB
+  String _formatBytes(int bytes, [int decimals = 2]) {
+    if (bytes < 1024) return "$bytes B"; // less than 1 KB
+    const int kb = 1024;
+    const int mb = kb * 1024;
+    const int gb = mb * 1024;
+
+    if (bytes < mb) {
+      return (bytes / kb).toStringAsFixed(decimals) + ' KB';
+    } else if (bytes < gb) {
+      return (bytes / mb).toStringAsFixed(decimals) + ' MB';
+    } else {
+      return (bytes / gb).toStringAsFixed(decimals) + ' GB';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +99,9 @@ class _SettingsWindowState extends State<SettingsWindow> {
             onDestinationSelected: (int index) {
               setState(() {
                 _selectedView = _getViewFromIndex(index);
+                if (_selectedView == 'APP Storage') {
+                  _fetchImageStorageInfo();
+                }
               });
             },
             labelType: NavigationRailLabelType.all,
@@ -105,14 +180,11 @@ class _SettingsWindowState extends State<SettingsWindow> {
       case 'Player':
         return Center(child: Text('Player Settings', style: TextStyle(fontSize: 24)));
       case 'APP Storage':
-        return Center(child: Text('APP Storage Settings', style: TextStyle(fontSize: 24)));
+        return _appStorageSettings();
       default:
         return Center(child: Text('General Settings', style: TextStyle(fontSize: 24)));
     }
   }
-
-
-
 
   Widget _generalSettings() {
     return Column(
@@ -159,23 +231,21 @@ class _SettingsWindowState extends State<SettingsWindow> {
           ],
         ),
         SizedBox(height: 16),
-
       ],
     );
   }
 
-
-  Future<http.Response> fetchImage(String url) async {
-    try {
-      final response = await http.get(Uri.parse(url)).timeout(Duration(seconds: 5)); // 5 seconds timeout
-      return response;
-    } on TimeoutException {
-      throw Exception('Request timed out');
-    } on http.ClientException {
-      throw Exception('Failed to load image');
-    }
+  Widget _appStorageSettings() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('APP Storage Information:', style: TextStyle(fontSize: 16)),
+        SizedBox(height: 16),
+        if (_imageStorageInfo != null)
+          ..._imageStorageInfo!.map((info) => Text(info)).toList()
+        else
+          CircularProgressIndicator(),
+      ],
+    );
   }
 }
-
-
-

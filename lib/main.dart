@@ -74,6 +74,8 @@ void main(List<String> args) async {
   runApp(const MyApp());
 
 
+
+  print("name"+getMacOSUsername());
   const platform1 = MethodChannel('com.example.app/settings');
 
   platform1.setMethodCallHandler((MethodCall call) async {
@@ -399,4 +401,16 @@ class ImageDownloader {
       return Image.asset('assets/err_img2.png'); // Fallback image in case of error
     }
   }
+
+  Future<List<String>?> getImageStorageInfo() async {
+    try {
+      final List<String>? info = await platform.invokeMethod("info");
+      print('Image storage info: $info');
+      return info;
+    } on PlatformException catch (e) {
+      print("Error getting image storage info: '${e.message}'.");
+      return null;
+    }
+  }
 }
+
