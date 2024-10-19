@@ -30,7 +30,7 @@ class _SettingsWindowState extends State<SettingsWindow> {
               });
             },
             labelType: NavigationRailLabelType.all,
-            destinations: [
+            destinations: const [
               NavigationRailDestination(
                 icon: Icon(Icons.settings),
                 label: Text('General'),
@@ -43,9 +43,13 @@ class _SettingsWindowState extends State<SettingsWindow> {
                 icon: Icon(Icons.play_circle_outline),
                 label: Text('Player'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.storage_outlined),
+                label: Text('APP Storage'),
+              ),
             ],
           ),
-          VerticalDivider(thickness: 1, width: 1), // Divider between sidebar and content
+          const VerticalDivider(thickness: 1, width: 1), // Divider between sidebar and content
 
           // Content area
           Expanded(
@@ -68,6 +72,8 @@ class _SettingsWindowState extends State<SettingsWindow> {
         return 1;
       case 'Player':
         return 2;
+      case 'APP Storage':
+        return 3;
       default:
         return 0;
     }
@@ -82,6 +88,8 @@ class _SettingsWindowState extends State<SettingsWindow> {
         return 'ShortCut';
       case 2:
         return 'Player';
+      case 3:
+        return 'APP Storage';
       default:
         return 'General';
     }
@@ -96,6 +104,8 @@ class _SettingsWindowState extends State<SettingsWindow> {
         return Center(child: Text('ShortCut Settings', style: TextStyle(fontSize: 24)));
       case 'Player':
         return Center(child: Text('Player Settings', style: TextStyle(fontSize: 24)));
+      case 'APP Storage':
+        return Center(child: Text('APP Storage Settings', style: TextStyle(fontSize: 24)));
       default:
         return Center(child: Text('General Settings', style: TextStyle(fontSize: 24)));
     }
@@ -149,27 +159,6 @@ class _SettingsWindowState extends State<SettingsWindow> {
           ],
         ),
         SizedBox(height: 16),
-        // Add other settings here, each in a new row
-        // show a img from https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg
-
-        // FutureBuilder<http.Response>(
-        //   future: fetchImage('https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg'),
-        //   builder: (context, snapshot) {
-        //     if (snapshot.connectionState == ConnectionState.waiting) {
-        //       return Center(child: CircularProgressIndicator());
-        //     } else if (snapshot.hasError) {
-        //       return Center(child: Text(snapshot.error.toString()));
-        //     } else {
-        //       // Image response is successful; you can use the response
-        //       return Image.network(
-        //         'https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg',
-        //         fit: BoxFit.cover,
-        //         width: double.infinity,
-        //         height: double.infinity,
-        //       );
-        //     }
-        //   },
-        // )
 
       ],
     );

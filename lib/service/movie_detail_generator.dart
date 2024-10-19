@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
+import 'package:path_provider/path_provider.dart';
 
 Future<Map<String, String?>> predictMovieDetail(String movieName) async {
   List<String> movieInfo = movieName.split(".");
@@ -32,7 +34,7 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
   String year = movieInfo[movieYearIndex];
 
   String resolution = movieName.contains("2160p")
-      ? "2160p"
+      ? "4k"
       : movieName.contains("1080p")
       ? "1080p"
       : movieName.contains("720p")
@@ -147,6 +149,57 @@ Future<void> fetchImageWithHeaders(String imageUrl) async {
     }
   } catch (e) {
     print('Error fetching image: $e');
+  }
+}
+
+
+
+Future<List<String>> getImgCacheInfo() async {
+  // Get the Documents directory dynamically
+  Directory documentsDirectory = await getApplicationDocumentsDirectory();
+
+  // Append the Posters subdirectory to the path
+  final String directoryPath = '${documentsDirectory.path}/Posters';
+
+  // Directory object for the given path
+  final directory = Directory(directoryPath);
+
+  // Check if the directory exists
+  if (!await directory.exists()) {
+    return ['Directory does not exist', '0', '0 KB']; // Handle missing directory case
+  }
+
+  // Initialize counters
+  int totalFiles = 0;
+  int totalSize = 0; // Size in bytes
+
+  // Get the list of files in the directory
+  await for (var entity in directory.list(recursive: false, followLinks: false)) {
+    if (entity is File) {
+      totalFiles++; // Count each file
+      totalSize += await entity.length(); // Add file size
+    }
+  }
+
+  // Convert totalSize to a more readable format (KB, MB, or GB)
+  String sizeFormatted = _formatBytes(totalSize);
+
+  return ['Number of posters: $totalFiles', 'Total size: $sizeFormatted'];
+}
+
+// Function to format bytes into KB, MB, GB
+String _formatBytes(int bytes, [int decimals = 2]) {
+  if (bytes < 1024) return "$bytes B"; // less than 1 KB
+  const int kb = 1024;
+  const int mb = kb * 1024;
+  const int gb = mb * 1024;
+
+  if (bytes < mb) {
+    return (bytes / kb).toStringAsFixed(decimals) + ' KB';
+  } else if (bytes < gb) {
+    return (bytes / mb).toStringAsFixed(decimals) + ' MB';
+  } else {
+    return (bytes / gb).toStringAsFixed(decimals) + ' GB';
   }
 }
 

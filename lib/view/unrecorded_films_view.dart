@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
+import 'package:home_cinema_app/component/movie_label.dart';
 import 'package:home_cinema_app/component/overlay.dart';
 import 'package:home_cinema_app/service/main_service.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
@@ -19,7 +21,7 @@ class UnrecordedFilmsView extends StatefulWidget {
 }
 
 class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
-  bool _isOverlayVisible = false;
+  Map<String,String> movieLabels = {};
   String? _filmsFolder;
   String? _selectedOption = 'All Folder';
   final List<String> _options = ['All Folder'];
@@ -90,6 +92,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       print("options: $_options");
     });
     bookmark = _allFilmsFolder[0]['bookMarks'];
+    String lastFolder = _allFilmsFolder[0]['films_folder'].split(Platform.pathSeparator).last;
     if (bookmark == "bookmark_placeholder") {
       final folder = _allFilmsFolder[0]['films_folder'];
       // print("folder: $folder");
@@ -107,30 +110,43 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       });
 
     }else if (bookmark != null && bookmark != "null1") {
-      final resolvedFile = await secureBookmarks.resolveBookmark(bookmark);
-      print("resolvedFile path: ${resolvedFile.path}");
-      List<String> folders = resolvedFile.path.split('/');
-      String lastFolder = folders[folders.length - 1];
-      print("lastFolder: $lastFolder");
+      try{
+        final resolvedFile = await secureBookmarks.resolveBookmark(bookmark);
+        print("resolvedFile path: ${resolvedFile.path}");
+        List<String> folders = resolvedFile.path.split('/');
+        String lastFolder = folders[folders.length - 1];
+        print("lastFolder: $lastFolder");
 
-      setState(() {
-        _selectedOption = lastFolder;
-      });
-
-      await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
-
-      try {
         setState(() {
-          _filmsFolder = resolvedFile.path;
-          _isLoading = true;
+          _selectedOption = lastFolder;
         });
-        // await Future.delayed(Duration(milliseconds: 200));
-        await _loadVideoFiles();
-        setState(() {
-          _isLoading = false;
-        });
-      } finally {
-        await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+
+        try {
+          setState(() {
+            _filmsFolder = resolvedFile.path;
+            _isLoading = true;
+          });
+          // await Future.delayed(Duration(milliseconds: 200));
+          await _loadVideoFiles();
+          setState(() {
+            _isLoading = false;
+          });
+        } finally {
+          await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+        }
+      }on PlatformException catch(e){
+        if (e.code == 'UnexpectedError' && e.message?.contains('NSCocoaErrorDomain Code=4') == true) {
+          print("Error: The file doesn’t exist.");
+          // Handle the specific error here
+
+          setState(() {
+            _isLoading = false;
+            _videoFiles = [VideoFile(name: "F01", path: "No such file or directory", size: -9999, lastModified: DateTime.now())];
+            _selectedOption = lastFolder;
+          });
+        } else {
+          print("Error: $e");
+        }
       }
     } else {
       setState(() {
@@ -165,7 +181,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
         try {
           List<VideoFile> list = await readVideoFiles(_filmsFolder!);
-          allList.addAll(list);
+          if (list[0].size != -9999) {
+            allList.addAll(list);
+          }
         } finally {
           await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
         }
@@ -200,13 +218,30 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       if(_platform == 'macos'){
         _filmsFolder = _optionsMap[newValue]?[0];
         String? bookmark = _optionsMap[newValue]?[1];
-        final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
-        await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
         try{
-          await _loadVideoFiles();
-        }finally{
-          await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+          final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
+          await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+          try{
+            await _loadVideoFiles();
+          }finally{
+            await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+          }
+        }on PlatformException catch(e){
+          if (e.code == 'UnexpectedError' && e.message?.contains('NSCocoaErrorDomain Code=4') == true) {
+            print("Error: The file doesn’t exist.");
+            // Handle the specific error here
+
+            setState(() {
+              _isLoading = false;
+              _videoFiles = [VideoFile(name: "F01", path: "No such file or directory", size: -9999, lastModified: DateTime.now())];
+              _selectedOption = _filmsFolder!.split(Platform.pathSeparator).last;
+            });
+          } else {
+            print("Error: $e");
+          }
         }
+
+
       }else{
         _filmsFolder = _optionsMap[newValue]?[0];
         await _loadVideoFiles();
@@ -502,19 +537,42 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
 
-  Widget _FilmDetailsModalNameInput(String filmName, String fileExtension, String newFilePath) {
-    return TextField(
-      controller: filmNameController,
-      decoration: InputDecoration(
-        labelText: 'Film Name (English Name is better for the Poster search)',
-        labelStyle: TextStyle(height: 0.8), // Adjust the height to move the label down
-      ),
-      onChanged: (value) {
-        setState(() {
-          filmName = value;
-          newFilePath = '${_filmsFolder!}/recorded_films/$filmName/$filmName$fileExtension';
-        });
+  Widget _movieLabels() {
+    List<Widget> labelWidgets = [];
+    print("movieLabels: $movieLabels");
+
+    if (movieLabels.containsKey("year")) {
+      labelWidgets.add(MovieLabel(text: movieLabels["year"]!, width: 25, height: 18, backgroundColor: Colors.grey));
+    }
+    if (movieLabels.containsKey("resolution")) {
+      labelWidgets.add(SizedBox(width: 6));
+      labelWidgets.add(MovieLabel(text: movieLabels["resolution"]!, width: 20, height: 18, backgroundColor: Colors.deepOrangeAccent));
+    }
+    if (movieLabels["remux"] == "true") {
+      labelWidgets.add(SizedBox(width: 6));
+      labelWidgets.add(MovieLabel(text: "REMUX", width: 33, height: 18, backgroundColor: Colors.greenAccent));
+    }
+    if (movieLabels["bluray"] == "true") {
+      labelWidgets.add(SizedBox(width: 6));
+      labelWidgets.add(MovieLabel(text: "BluRay", width: 33, height: 18, backgroundColor: Colors.blue));
+    }
+    if (movieLabels["atmos"] == "true") {
+      labelWidgets.add(SizedBox(width: 6));
+      labelWidgets.add(MovieLabel(text: "ATMOS", width: 33, height: 18, backgroundColor: Colors.orange));
+    }
+    if (movieLabels["INT"] == "true") {
+      labelWidgets.add(SizedBox(width: 6));
+      labelWidgets.add(MovieLabel(text: "INT", width: 20, height: 18, backgroundColor: Colors.purple));
+    }
+
+    return InkWell(
+      onTap: () {
+        print("Row clicked");
+        // Handle the click event for the entire row
       },
+      child: Row(
+        children: labelWidgets,
+      ),
     );
   }
 
@@ -546,6 +604,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     );
 
     Map<String, String?> movieInfo = await predictMovieDetail(videoFile.name);
+    print("movieInfo: $movieInfo");
     for(var key in movieInfo.keys){
       if (key == "err") {
         print("Error predicting movie detail");
@@ -558,11 +617,22 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         setState(() {
           coverImg = imagePath;
         });
+      }else if(key == "year"){
+        movieLabels["year"] = movieInfo[key]!;
+      }else if (key == "resolution") {
+        movieLabels["resolution"] = movieInfo[key]!;
+      }else if (key == "isRemux") {
+        movieLabels["remux"] = movieInfo[key]!;
+      }else if (key == "isBluRay") {
+        movieLabels["bluray"] = movieInfo[key]!;
+      }else if (key == "isAtmos") {
+        movieLabels["atmos"] = movieInfo[key]!;
+      }else if (key == "isINT") {
+        movieLabels["INT"] = movieInfo[key]!;
       }
     }
 
     String newFilePath = '${_filmsFolder!}/recorded_films/$filmName/${videoFile.name}';
-
 
     LoadingOverlay.hide(context);
 
@@ -617,11 +687,11 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 ? Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                const Text('Category:'),
+                                const Text('Category:', style: TextStyle(fontSize: 13)),
                                 SizedBox(width: 8),
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  height: 40,
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  height: 20,
                                   decoration: BoxDecoration(
                                     border: Border.all(color: Colors.grey),
                                     borderRadius: BorderRadius.circular(8),
@@ -629,6 +699,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
                                       value: _selectedCategory,
+
                                       onChanged: (String? newValue) {
                                         setState(() {
                                           _selectedCategory = newValue!;
@@ -841,32 +912,39 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
   Widget _movieImageBox() {
-    final imageDownloader = ImageDownloader(); // Create an instance of ImageDownloader
+    final imageDownloader = ImageDownloader();
     String imageName = coverImg.split('/').last;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Row(
-          children: [
-            Text(
-              'Movie Poster',
-              style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
-            ),
-            SizedBox(width: 4),
-            Tooltip(
-              message: 'Poster image from tmdb.org, NO commercial use!',
-              child: Icon(
-                Icons.help_outline,
-                size: 16,
-                color: Colors.grey,
+        // Centered header row
+        Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Movie Poster',
+                style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
               ),
-            ),
-          ],
+              SizedBox(width: 4),
+              Tooltip(
+                message: 'Poster image from tmdb.org, NO commercial use!',
+                child: Icon(
+                  Icons.help_outline,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
         ),
         SizedBox(height: 8),
-        if (coverImg == "")
-          Container(
+        // Centered poster container
+        Center(
+          child: coverImg == ""
+              ? Container(
             width: 150,
             height: 230,
             decoration: BoxDecoration(
@@ -877,14 +955,33 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               child: Image.asset('assets/no_img.png'),
             ),
           )
-        else
-          FutureBuilder<Image>(
+              : FutureBuilder<Image>(
             future: imageDownloader.downloadImage(imageName),
             builder: (BuildContext context, AsyncSnapshot<Image> snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return CircularProgressIndicator();
+                return Container(
+                  width: 150,
+                  height: 230,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
               } else if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}');
+                return Container(
+                  width: 150,
+                  height: 230,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text('Error: ${snapshot.error}'),
+                  ),
+                );
               } else {
                 return Container(
                   width: 150,
@@ -903,10 +1000,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               }
             },
           ),
+        ),
         SizedBox(height: 8),
-        if (coverImg == "")
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        // Centered buttons
+        Center(
+          child: coverImg == ""
+              ? Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton(
                 onPressed: () {
@@ -914,6 +1014,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 },
                 child: Text('Upload'),
               ),
+              SizedBox(width: 8),
               ElevatedButton(
                 onPressed: () {
                   // Handle search action
@@ -922,13 +1023,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               ),
             ],
           )
-        else
-          ElevatedButton(
+              : ElevatedButton(
             onPressed: () {
               // Handle delete action
             },
             child: Text('Delete Poster'),
           ),
+        ),
       ],
     );
   }
@@ -996,7 +1097,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     return StatefulBuilder(
       builder: (BuildContext context, StateSetter setState) {
-        return Row(
+        return Column(
+          children: [
+          Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
@@ -1029,8 +1132,14 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               borderRadius: BorderRadius.circular(8.0),
               constraints: BoxConstraints(minHeight: 24.0, minWidth: 44.0), // Make the buttons smaller
             ),
+            SizedBox(width: 8),
+            _movieLabels(),
+          ],
+        ),
+          SizedBox(height: 8),
           ],
         );
+
       },
     );
   }

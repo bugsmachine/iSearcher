@@ -33,7 +33,7 @@ class MainFlutterWindow: NSWindow {
 
     // Method to download an image
     func getIMG(imageName: String, result: @escaping FlutterResult) {
-        print("getIMG....")
+//        print("getIMG....")
         // URL of the image to download
         // check if the file already exists in the Documents directory
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -50,7 +50,7 @@ class MainFlutterWindow: NSWindow {
         
         let imageURL = imgDir.appendingPathComponent(imageName)
         if( FileManager.default.fileExists(atPath: imageURL.path) ){
-            print("Image already exists in Documents: \(imageURL.path)")
+//            print("Image already exists in Documents: \(imageURL.path)")
             if let imageData = try? Data(contentsOf: imageURL) {
                 // Return the image data as a base64 encoded string
                 let base64String = imageData.base64EncodedString()
