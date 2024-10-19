@@ -37,7 +37,18 @@ class MainFlutterWindow: NSWindow {
         // URL of the image to download
         // check if the file already exists in the Documents directory
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let imageURL = documentsDirectory.appendingPathComponent(imageName)
+        let imgDir = documentsDirectory.appendingPathComponent("Posters")
+        // check if exists, create if not
+        if !FileManager.default.fileExists(atPath: imgDir.path) {
+            do {
+                try FileManager.default.createDirectory(atPath: imgDir.path, withIntermediateDirectories: true, attributes: nil)
+            } catch {
+                result(FlutterError(code: "CREATE_DIR_ERROR", message: error.localizedDescription, details: nil))
+                return
+            }
+        }
+        
+        let imageURL = imgDir.appendingPathComponent(imageName)
         if( FileManager.default.fileExists(atPath: imageURL.path) ){
             print("Image already exists in Documents: \(imageURL.path)")
             if let imageData = try? Data(contentsOf: imageURL) {
@@ -67,9 +78,7 @@ class MainFlutterWindow: NSWindow {
                     return
                 }
                 
-                // Get the path to the Documents directory and the final destination for the image
-                let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-                let imageURL = documentsDirectory.appendingPathComponent(imageName)
+            
                 
                 do {
                     // Move the downloaded file to the Documents directory

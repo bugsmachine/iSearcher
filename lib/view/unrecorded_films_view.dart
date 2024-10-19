@@ -502,6 +502,23 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
 
+  Widget _FilmDetailsModalNameInput(String filmName, String fileExtension, String newFilePath) {
+    return TextField(
+      controller: filmNameController,
+      decoration: InputDecoration(
+        labelText: 'Film Name (English Name is better for the Poster search)',
+        labelStyle: TextStyle(height: 0.8), // Adjust the height to move the label down
+      ),
+      onChanged: (value) {
+        setState(() {
+          filmName = value;
+          newFilePath = '${_filmsFolder!}/recorded_films/$filmName/$filmName$fileExtension';
+        });
+      },
+    );
+  }
+
+
 
   Future<void> _showEditFilmDetailsModal(BuildContext context, VideoFile videoFile) async {
     setState(() {
@@ -512,7 +529,6 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     tagFields.add(_buildTagField(0, modalKey));
     String filmName = '';
     String fileExtension = '.${videoFile.name.split('.').last}';
-    String newFilePath = '${_filmsFolder!}/recorded_films/${videoFile.name}';
 
     filmNameController.text = "";
     categoryController.text = "";
@@ -521,6 +537,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     _tagControllers.clear();
     tagFields.add(_buildTagField(0, modalKey));
     _tagControllers.add(TextEditingController());
+
+    LoadingOverlay.show(
+      context,
+      'Predicting Movie Detail...',
+      width: 250,
+      height: 150,
+    );
 
     Map<String, String?> movieInfo = await predictMovieDetail(videoFile.name);
     for(var key in movieInfo.keys){
@@ -538,6 +561,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       }
     }
 
+    String newFilePath = '${_filmsFolder!}/recorded_films/$filmName/${videoFile.name}';
+
+
+    LoadingOverlay.hide(context);
 
     CustomModal.show(
       context,
@@ -565,14 +592,14 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 Expanded(
                                   child: TextField(
                                     controller: filmNameController,
-                                    decoration: InputDecoration(
+                                    decoration: const InputDecoration(
                                       labelText: 'Film Name (English Name is better for the Poster search)',
                                       labelStyle: TextStyle(height: 0.8), // Adjust the height to move the label down
                                     ),
                                     onChanged: (value) {
                                       setState(() {
                                         filmName = value;
-                                        newFilePath = '${_filmsFolder!}/recorded_films/$filmName$fileExtension';
+                                        newFilePath = '${_filmsFolder!}/recorded_films/$filmName/$filmName$fileExtension';
                                       });
                                     },
                                   ),
@@ -584,8 +611,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 ),
                               ],
                             ),
-                            _buildNonEditableField('File Path', newFilePath),
-                            SizedBox(height: 16),
+                            _buildNonEditableField('File Path', newFilePath, "This is the new planed file path. Original path ${videoFile.path}"),
+                            _fileType(),
                             _categories.isNotEmpty
                                 ? Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -964,6 +991,51 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     );
   }
 
+  Widget _fileType() {
+    List<bool> isSelected = [true, false]; // Initial selection state
+
+    return StatefulBuilder(
+      builder: (BuildContext context, StateSetter setState) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              'Select File Type:',
+              style: TextStyle(fontSize: 13, color: Colors.black),
+            ),
+            SizedBox(width: 8),
+            ToggleButtons(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text('Movie'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Text('Video'),
+                ),
+              ],
+              isSelected: isSelected,
+              onPressed: (int index) {
+                setState(() {
+                  for (int i = 0; i < isSelected.length; i++) {
+                    isSelected[i] = i == index;
+                  }
+                });
+              },
+              color: Colors.black, // Color of the text when not selected
+              selectedColor: Colors.white, // Color of the text when selected
+              fillColor: Colors.blue, // Background color when selected
+              borderRadius: BorderRadius.circular(8.0),
+              constraints: BoxConstraints(minHeight: 24.0, minWidth: 44.0), // Make the buttons smaller
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
   // Method to collect all tags
   List<List<String>> _collectInfo() {
     List<List<String>> info = [];
@@ -979,14 +1051,46 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     return info;
   }
 
-  Widget _buildNonEditableField(String label, String value) {
-    return TextField(
-      decoration: InputDecoration(
-        labelText: label,
-      ),
-      controller: TextEditingController(text: value),
-      readOnly: true,
+  Widget _buildNonEditableField(String label, String value, String tooltipMessage) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 8),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF616060)
+              ),
+
+            ),
+            SizedBox(width: 4),
+            Tooltip(
+              message: tooltipMessage,
+              preferBelow: false, // This makes the tooltip appear above the icon
+              verticalOffset: -50,
+              child: Icon(
+                Icons.help_outline,
+                size: 13,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+        TextField(
+          decoration: InputDecoration(
+            labelText: null, // Remove the label
+            isDense: true, // Makes the TextField more compact
+            contentPadding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 0.0), // Adjusts vertical and horizontal padding
+          ),
+          controller: TextEditingController(text: value),
+          readOnly: true,
+        ),
+        SizedBox(height: 10),
+      ],
     );
   }
-
 }

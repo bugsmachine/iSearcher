@@ -149,3 +149,7 @@ Future<void> fetchImageWithHeaders(String imageUrl) async {
     print('Error fetching image: $e');
   }
 }
+
+Future<void> cleanPosterCache() async {
+
+}
