@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class SettingsWindow extends StatefulWidget {
   @override
@@ -149,11 +152,40 @@ class _SettingsWindowState extends State<SettingsWindow> {
         // Add other settings here, each in a new row
         // show a img from https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg
 
-        Image.network('https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg'),
+        // FutureBuilder<http.Response>(
+        //   future: fetchImage('https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg'),
+        //   builder: (context, snapshot) {
+        //     if (snapshot.connectionState == ConnectionState.waiting) {
+        //       return Center(child: CircularProgressIndicator());
+        //     } else if (snapshot.hasError) {
+        //       return Center(child: Text(snapshot.error.toString()));
+        //     } else {
+        //       // Image response is successful; you can use the response
+        //       return Image.network(
+        //         'https://image.tmdb.org/t/p/w500/y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg',
+        //         fit: BoxFit.cover,
+        //         width: double.infinity,
+        //         height: double.infinity,
+        //       );
+        //     }
+        //   },
+        // )
+
       ],
     );
   }
 
+
+  Future<http.Response> fetchImage(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url)).timeout(Duration(seconds: 5)); // 5 seconds timeout
+      return response;
+    } on TimeoutException {
+      throw Exception('Request timed out');
+    } on http.ClientException {
+      throw Exception('Failed to load image');
+    }
+  }
 }
 
 

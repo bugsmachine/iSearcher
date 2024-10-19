@@ -38,10 +38,11 @@ dependencies:
   macos_secure_bookmarks: ^0.2.1
   url_launcher: ^6.0.20
   win32: ^5.6.0
-  cached_network_image: ^3.2.0
   http: ^1.2.2
+  shelf: ^1.4.1
   flutter:
     sdk: flutter
+
 
 
   # The following adds the Cupertino Icons font to your application.
@@ -69,6 +70,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/no_img.png
+    - assets/err_img1.png
+    - assets/err_img2.png
+
 
   # To add assets to your application, add an assets section, like this:
   # assets:

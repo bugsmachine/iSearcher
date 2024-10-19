@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:home_cinema_app/component/overlay.dart';
 import 'package:home_cinema_app/service/main_service.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import '../component/inner_top_bar.dart';
+import '../main.dart';
 import '../repository/db.dart';
 import '../models/video_file.dart';
 import 'package:macos_secure_bookmarks/macos_secure_bookmarks.dart';
@@ -17,6 +19,7 @@ class UnrecordedFilmsView extends StatefulWidget {
 }
 
 class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
+  bool _isOverlayVisible = false;
   String? _filmsFolder;
   String? _selectedOption = 'All Folder';
   final List<String> _options = ['All Folder'];
@@ -445,7 +448,15 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                             IconButton(
                               icon: Icon(Icons.play_circle_outline_outlined, color: Colors.blue),
                               onPressed: () async {
+                                LoadingOverlay.show(
+                                  context,
+                                  'Opening video...',
+                                  width: 200,
+                                  height: 120,
+                                );
                                 if (_platform == "macos"){
+                                  // add 5 second delay
+                                  await Future.delayed(Duration(seconds: 5));
                                   final secureBookmarks = SecureBookmarks();
                                   String? bookmark = _optionsMap[_selectedOption]?[1];
                                   final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
@@ -459,6 +470,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                       print('Could not launch $videoPath');
                                     }
                                   }finally{
+                                    LoadingOverlay.hide(context);
                                     await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
                                   }
                                 }else{
@@ -492,6 +504,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
   Future<void> _showEditFilmDetailsModal(BuildContext context, VideoFile videoFile) async {
+    setState(() {
+      coverImg = "";
+    });
     String imagePath = '';
     GlobalKey<State> modalKey = GlobalKey<State>();
     tagFields.add(_buildTagField(0, modalKey));
@@ -551,7 +566,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   child: TextField(
                                     controller: filmNameController,
                                     decoration: InputDecoration(
-                                      labelText: 'Film Name',
+                                      labelText: 'Film Name (English Name is better for the Poster search)',
                                       labelStyle: TextStyle(height: 0.8), // Adjust the height to move the label down
                                     ),
                                     onChanged: (value) {
@@ -769,138 +784,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                           ],
                         ),
                       ),
-                      SizedBox(width: 20),
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Cover Image', style: TextStyle(fontWeight: FontWeight.bold)),
-                            SizedBox(height: 8),
-                            Container(
-                              width: 200,
-                              height: 250,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: imagePath.isEmpty
-                                  ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  ElevatedButton(
-                                    child: Text('Upload'),
-                                    onPressed: () {
-                                      FilePicker.platform.pickFiles(allowMultiple: false).then((result) {
-                                        if (result != null && result.files.isNotEmpty) {
-                                          if (result.files.single.path != null) {
-                                            print('Image Path: ${result.files.single.path}');
-                                            setState(() {
-                                              imagePath = result.files.single.path!;
-                                              coverImg = imagePath;
-                                              print('Image Path: $imagePath');
-                                            });
-                                          }
-                                        }
-                                      });
-                                    },
-                                  ),
-                                  SizedBox(height: 8),
-                                  ElevatedButton(
-                                    child: Text('Search from Google'),
-                                    onPressed: () async {
-                                      if (filmName.isNotEmpty) {
-                                        final query = Uri.encodeComponent('$filmName movie cover image');
-                                        final url = Uri.parse('$_searchEngine/search?tbm=isch&q=$query');
-                                        if (await canLaunchUrl(url)) {
-                                          await launchUrl(url);
-                                        } else {
-                                          CustomModal.show(
-                                            context,
-                                            'Error',
-                                            Text('Could not launch the browser.'),
-                                            [
-                                              TextButton(
-                                                child: Text('OK'),
-                                                onPressed: () {
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                            ],
-                                          );
-                                        }
-                                      } else {
-                                        CustomModal.show(
-                                          context,
-                                          'Error',
-                                          Text('Please enter a film name first.'),
-                                          [
-                                            TextButton(
-                                              child: Text('OK'),
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                          ],
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ],
-                              )
-                              :FutureBuilder(
-                                future: imagePath.contains('http')
-                                    ? Future.value(true)
-                                    : File(imagePath).exists(),
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return Center(child: CircularProgressIndicator());
-                                  } else if (snapshot.hasError ||
-                                      (!snapshot.data! && !imagePath.contains('http'))) {
-                                    return Center(child: Text('File does not exist'));
-                                  } else {
-                                    return Container(
-                                      width: 200,
-                                      height: 250,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: imagePath.contains('http')
-                                            ? Image.network(
-                                          imagePath,
-                                          fit: BoxFit.cover,
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                          loadingBuilder: (context, child, loadingProgress) {
-                                            if (loadingProgress == null) return child;
-                                            return Center(
-                                              child: CircularProgressIndicator(
-                                                value: loadingProgress.expectedTotalBytes != null
-                                                    ? loadingProgress.cumulativeBytesLoaded /
-                                                    (loadingProgress.expectedTotalBytes ?? 1)
-                                                    : null,
-                                              ),
-                                            );
-                                          },
-                                          errorBuilder: (context, error, stackTrace) {
-                                            print(error);
-                                            return Center(child: Text('Failed to load image'));
-                                          },
-                                        )
-                                            : Image.file(
-                                          File(imagePath),
-                                          fit: BoxFit.cover,
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      SizedBox(width: 13),
+                      _movieImageBox(),
                     ],
                   ),
                 ],
@@ -925,6 +810,99 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       ],
       width: 600,
       height: 400,
+    );
+  }
+
+  Widget _movieImageBox() {
+    final imageDownloader = ImageDownloader(); // Create an instance of ImageDownloader
+    String imageName = coverImg.split('/').last;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Text(
+              'Movie Poster',
+              style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
+            ),
+            SizedBox(width: 4),
+            Tooltip(
+              message: 'Poster image from tmdb.org, NO commercial use!',
+              child: Icon(
+                Icons.help_outline,
+                size: 16,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+        if (coverImg == "")
+          Container(
+            width: 150,
+            height: 230,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Image.asset('assets/no_img.png'),
+            ),
+          )
+        else
+          FutureBuilder<Image>(
+            future: imageDownloader.downloadImage(imageName),
+            builder: (BuildContext context, AsyncSnapshot<Image> snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator();
+              } else if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              } else {
+                return Container(
+                  width: 150,
+                  height: 230,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                    image: snapshot.hasData
+                        ? DecorationImage(
+                      image: snapshot.data!.image,
+                      fit: BoxFit.cover,
+                    )
+                        : null,
+                  ),
+                );
+              }
+            },
+          ),
+        SizedBox(height: 8),
+        if (coverImg == "")
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  // Handle upload action
+                },
+                child: Text('Upload'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  // Handle search action
+                },
+                child: Text('Search'),
+              ),
+            ],
+          )
+        else
+          ElevatedButton(
+            onPressed: () {
+              // Handle delete action
+            },
+            child: Text('Delete Poster'),
+          ),
+      ],
     );
   }
 
@@ -966,11 +944,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               }
               // Update both modal and parent state to reflect the change
               modalKey.currentState?.setState(() {
+                print(index);
                 tagFields.removeAt(index);
                 // add an empty view at the place delete tagFileds
                 tagFields.insert(index, SizedBox.shrink()); // Add an empty view at the same index
 
-                _tagControllers.removeAt(index);
+                // _tagControllers.removeAt(index);
               });
               // setState(() {
               //   print(_tagControllers.length);

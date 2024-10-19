@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import 'package:home_cinema_app/view/all_movies_view.dart';
 import 'package:home_cinema_app/view/unrecorded_films_view.dart';
 import 'package:sqflite/sqflite.dart';
@@ -13,6 +14,8 @@ import 'service/main_service.dart';
 import 'package:home_cinema_app/app_config/colors.dart';
 import '../component/modal.dart';
 import 'view/settings.dart';
+import 'package:http/http.dart' as http;
+
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +56,7 @@ void main(List<String> args) async {
     });
   }
 
-
+  // await startFlaskServer();
 
 
   await initDatabase();
@@ -70,6 +73,7 @@ void main(List<String> args) async {
 
   runApp(const MyApp());
 
+
   const platform1 = MethodChannel('com.example.app/settings');
 
   platform1.setMethodCallHandler((MethodCall call) async {
@@ -80,6 +84,42 @@ void main(List<String> args) async {
 }
 
 
+
+
+// Future<void> startFlaskServer() async {
+//   final process = await Process.start('/usr/bin/python3', ['-c', '''
+// from flask import Flask, request, send_file, jsonify
+// import requests
+// from io import BytesIO
+//
+// app = Flask(__name__)
+//
+// @app.route('/image', methods=['GET'])
+// def download_image():
+//     image_path = request.args.get('image_path')
+//     if not image_path:
+//         return jsonify({"error": "No image path provided"}), 400
+//
+//     url = f"https://image.tmdb.org/t/p/w500/{image_path}"
+//     response = requests.get(url)
+//
+//     if response.status_code == 200:
+//         img = BytesIO(response.content)
+//         return send_file(img, mimetype='image/jpeg', as_attachment=True, download_name='downloaded_image.jpg')
+//     else:
+//         return jsonify(
+//             {"error": f"Failed to download image. Status code: {response.status_code}"}), response.status_code
+//
+// if __name__ == '__main__':
+//     app.run(debug=True)
+// ''']);
+//   process.stdout.transform(utf8.decoder).listen((data) {
+//     print(data);
+//   });
+//   process.stderr.transform(utf8.decoder).listen((data) {
+//     print(data);
+//   });
+// }
 
 Future<void> openSettingsWindow() async {
   final window = await DesktopMultiWindow.createWindow(jsonEncode({
@@ -316,17 +356,47 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   }
 
   Widget _buildMainContent() {
+    final imageDownloader = ImageDownloader(); // Create an instance of ImageDownloader
+
     switch (_selectedIndex) {
       case 0:
         return AllMoviesView();
       case 1:
         return UnrecordedFilmsView();
       case 2:
-        return const Center(child: Text('Category'));
+        return FutureBuilder<Image>(
+          future: imageDownloader.downloadImage("y4MBh0EjBlMuOzv9axM4qJlmhzz.jpg"),
+          builder: (BuildContext context, AsyncSnapshot<Image> snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircularProgressIndicator();
+            } else if (snapshot.hasError) {
+              return Text('Error: ${snapshot.error}');
+            } else {
+              return snapshot.data ?? Container();
+            }
+          },
+        );
       case 3:
         return const Center(child: Text('Settings')); // Placeholder for settings
       default:
         return const Center(child: Text('Unknown Page'));
+    }
+  }
+
+
+}
+
+class ImageDownloader {
+  static const platform = MethodChannel('image_download_channel');
+
+  Future<Image> downloadImage(String imageName) async {
+    try {
+      final String base64Image = await platform.invokeMethod('getImage', {'imageName': imageName});
+      final bytes = base64.decode(base64Image);
+      return Image.memory(Uint8List.fromList(bytes));
+    } catch (e) {
+      print("Error downloading image: $e");
+      return Image.asset('assets/err_img2.png'); // Fallback image in case of error
     }
   }
 }

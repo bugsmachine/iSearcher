@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http/http.dart';
 
 Future<Map<String, String?>> predictMovieDetail(String movieName) async {
   List<String> movieInfo = movieName.split(".");
@@ -110,5 +112,40 @@ Map<String, String> cleanTitle(String title) {
     };
   } else {
     return {"title": title};
+  }
+}
+
+
+
+Future<void> fetchImageWithHeaders(String imageUrl) async {
+  final headers = {
+    'User-Agent': 'iSearcher/1.0',
+    'Accept': 'image/*',
+    'Host': 'image.tmdb.org',
+    "Connection": "Keep-Alive",
+    "accept-encoding": "gzip, deflate, br"
+    // Add more headers if needed
+  };
+
+  try {
+    Uri uri = Uri.parse(imageUrl);
+
+    Response response = await http.put(
+      uri,
+      headers: headers,
+      body: Uint8List(0),
+    ).timeout(Duration(seconds: 5), onTimeout: () {
+      print('Timeout');
+      return Response('', 411);
+    });
+
+    if (response.statusCode == 200) {
+      print('Image loaded successfully');
+      // Process image data here
+    } else {
+      print('Failed to load image: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Error fetching image: $e');
   }
 }
