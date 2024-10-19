@@ -12,9 +12,12 @@
             <!-- Optional: new features, improvements, and fixes -->
             <description>
                 <![CDATA[
-                    - Feature: Improved search performance.
-                    - Fix: Resolved issue with downloading large files.
-                    - Enhancement: Updated UI for better accessibility.
+                <style>ul{margin-top: 0;margin-bottom: 7;padding-left: 18;}</style><ul>
+                <li>Fix 1</li>
+                <li>Futrerea</li>
+                </ul><ul>
+                <li>Supports pinning any device to the status bar.</li>
+                <li>Improved the button style to be more beautiful.</li>
                 ]]>
             </description>
         </item>
