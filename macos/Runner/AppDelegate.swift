@@ -1,9 +1,10 @@
 import Cocoa
 import FlutterMacOS
 import Sparkle
+import Foundation
 
 @main
-class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate {
     // Add the Sparkle updater controller
     let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
@@ -12,6 +13,14 @@ class AppDelegate: FlutterAppDelegate {
 
     // Add a window property
     var window: NSWindow?
+    
+    var flaskProcess: Process?
+
+    // Method channel for communication with Flutter
+    var channel: FlutterMethodChannel?
+    
+    var channel2: FlutterMethodChannel?
+    
 
     override func awakeFromNib() {
         super.awakeFromNib()
@@ -39,12 +48,18 @@ class AppDelegate: FlutterAppDelegate {
         let appVersion = "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))"
         print("Bundle Identifier: \(bundleIdentifier)")
         print("App Version: \(appVersion)")
+        
+        
+
     }
 
     override func applicationDidFinishLaunching(_ notification: Notification) {
         // Call the existing Flutter setup
         super.applicationDidFinishLaunching(notification)
-
+        
+        print("applicationDidFinishLaunching called")
+            
+        
         // Optionally, you can set Sparkle to check for updates in the background
         updaterController.updater.checkForUpdatesInBackground()
         // print the current version
@@ -56,6 +71,8 @@ class AppDelegate: FlutterAppDelegate {
             self.window = window
         }
     }
+
+    
 
     // Action to trigger Sparkle's update check
     @objc func checkForUpdates() {

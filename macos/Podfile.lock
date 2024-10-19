@@ -6,9 +6,6 @@ PODS:
   - FlutterMacOS (1.0.0)
   - macos_secure_bookmarks (0.0.3):
     - FlutterMacOS
-  - path_provider_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
   - screen_retriever (0.0.1):
     - FlutterMacOS
   - Sparkle (2.6.4)
@@ -25,7 +22,6 @@ DEPENDENCIES:
   - desktop_multi_window (from `Flutter/ephemeral/.symlinks/plugins/desktop_multi_window/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - macos_secure_bookmarks (from `Flutter/ephemeral/.symlinks/plugins/macos_secure_bookmarks/macos`)
-  - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
   - screen_retriever (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever/macos`)
   - Sparkle (~> 2.0)
   - sqflite_darwin (from `Flutter/ephemeral/.symlinks/plugins/sqflite_darwin/darwin`)
@@ -45,8 +41,6 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
   macos_secure_bookmarks:
     :path: Flutter/ephemeral/.symlinks/plugins/macos_secure_bookmarks/macos
-  path_provider_foundation:
-    :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
   screen_retriever:
     :path: Flutter/ephemeral/.symlinks/plugins/screen_retriever/macos
   sqflite_darwin:
@@ -61,7 +55,6 @@ SPEC CHECKSUMS:
   desktop_multi_window: 566489c048b501134f9d7fb6a2354c60a9126486
   FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
   macos_secure_bookmarks: cff041c4b377fa00941bb901aaec4d27fac5edf2
-  path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
   screen_retriever: 59634572a57080243dd1bf715e55b6c54f241a38
   Sparkle: 5f8960a7a119aa7d45dacc0d5837017170bc5675
   sqflite_darwin: a553b1fd6fe66f53bbb0fe5b4f5bab93f08d7a13
