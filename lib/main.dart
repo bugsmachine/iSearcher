@@ -75,7 +75,7 @@ void main(List<String> args) async {
 
 
 
-  print("name"+getMacOSUsername());
+  // print("name"+getMacOSUsername());
   const platform1 = MethodChannel('com.example.app/settings');
 
   platform1.setMethodCallHandler((MethodCall call) async {

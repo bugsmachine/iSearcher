@@ -31,6 +31,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   String? _searchEngine;
   String? _modalErrorMessage;
   String? _platform;
+  String? _selectedSubtitlePath = "";
+  List<String> _subtitles = [];
 
   // a map to hold the options and their values, default is 'All Folder': 'All Folder'
   Map<String, List<String>> _optionsMap = {'All Folder': ['All Folder', 'All Folder']};
@@ -89,7 +91,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
           _optionsMap[lastFolder] = [fileFolder, folder['bookMarks']];
         }
       }
-      print("options: $_options");
+      // print("options: $_options");
     });
     bookmark = _allFilmsFolder[0]['bookMarks'];
     String lastFolder = _allFilmsFolder[0]['films_folder'].split(Platform.pathSeparator).last;
@@ -112,10 +114,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     }else if (bookmark != null && bookmark != "null1") {
       try{
         final resolvedFile = await secureBookmarks.resolveBookmark(bookmark);
-        print("resolvedFile path: ${resolvedFile.path}");
+        // print("resolvedFile path: ${resolvedFile.path}");
         List<String> folders = resolvedFile.path.split('/');
         String lastFolder = folders[folders.length - 1];
-        print("lastFolder: $lastFolder");
+        // print("lastFolder: $lastFolder");
 
         setState(() {
           _selectedOption = lastFolder;
@@ -537,6 +539,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
 
+
   Widget _movieLabels() {
     List<Widget> labelWidgets = [];
     print("movieLabels: $movieLabels");
@@ -683,40 +686,144 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                             ),
                             _buildNonEditableField('File Path', newFilePath, "This is the new planed file path. Original path ${videoFile.path}"),
                             _fileType(),
+                            // _subtitle(),
+                            Row(
+                              children: [
+                                const Text(
+                                  "Subtitle:",
+                                  style: TextStyle(fontSize: 13, color: Colors.black),
+                                ),
+                                const SizedBox(width: 8),
+                                if (_selectedSubtitlePath == null || _selectedSubtitlePath!.isEmpty) ...[
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      FilePickerResult? result = await FilePicker.platform.pickFiles();
+                                      if (result != null) {
+                                        PlatformFile file = result.files.first;
+                                        setState(() {
+                                          _selectedSubtitlePath = file.path;
+                                          _subtitles.add(file.path!);
+                                        });
+                                        print("Subtitle path: $_selectedSubtitlePath");
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      textStyle: const TextStyle(fontSize: 10),
+                                    ),
+                                    child: const Text("Upload Subtitle"),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      // Handle search subtitle
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      textStyle: const TextStyle(fontSize: 10),
+                                    ),
+                                    child: const Text("Search Subtitle"),
+                                  ),
+                                ] else ...[
+                                  Container(
+                                    height: 36,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.grey.shade400),
+                                      color: Colors.white,
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(maxWidth: 200), // Set the max width to 200
+                                        child: DropdownButton<String>(
+                                          isExpanded: true, // Allow DropdownButton to take full width of 200
+                                          value: _selectedSubtitlePath,
+                                          icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
+                                          dropdownColor: Colors.white,
+                                          style: TextStyle(color: Colors.black, fontSize: 14),
+                                          items: _subtitles.map<DropdownMenuItem<String>>((String value) {
+                                            String displayValue = value.split('/').last;
+                                            return DropdownMenuItem<String>(
+                                              value: value,
+                                              child: Center( // Center the text
+                                                child: Tooltip(
+                                                  message: value, // Full file path as tooltip
+                                                  waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
+                                                  child: Text(
+                                                    displayValue,
+                                                    overflow: TextOverflow.ellipsis, // Truncate long text
+                                                    maxLines: 1, // Keep text to a single line
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (String? newValue) {
+                                            setState(() {
+                                              _selectedSubtitlePath = newValue;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.manage_accounts),
+                                    onPressed: () {
+                                      // Handle manage subtitle
+                                    },
+                                  ),
+                                ],
+                              ],
+                            ),
                             _categories.isNotEmpty
                                 ? Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text('Category:', style: TextStyle(fontSize: 13)),
-                                SizedBox(width: 8),
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedCategory,
-
-                                      onChanged: (String? newValue) {
-                                        setState(() {
-                                          _selectedCategory = newValue!;
-                                        });
-                                      },
-                                      items: _categories.map<DropdownMenuItem<String>>((String value) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(
-                                            value,
-                                            style: TextStyle(fontSize: 14),
-                                          ),
-                                        );
-                                      }).toList(),
+                                children: [
+                                  const Text('Category:', style: TextStyle(fontSize: 13, color: Colors.black)),
+                                  SizedBox(width: 8),
+                                  Container(
+                                    height: 36,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.grey.shade400),
+                                      color: Colors.white,
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(maxWidth: 100), // Set the max width to 200
+                                        child: DropdownButton<String>(
+                                          isExpanded: true, // Allow DropdownButton to take full width of 200
+                                          value: _selectedCategory,
+                                          icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
+                                          dropdownColor: Colors.white,
+                                          style: TextStyle(color: Colors.black, fontSize: 14),
+                                          items: _categories.map<DropdownMenuItem<String>>((String value) {
+                                            return DropdownMenuItem<String>(
+                                              value: value,
+                                              child: Tooltip(
+                                                message: value, // Show full text on hover
+                                                waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
+                                                child: Text(
+                                                  value,
+                                                  overflow: TextOverflow.ellipsis, // Truncate long text
+                                                  maxLines: 1, // Keep text to a single line
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (String? newValue) {
+                                            setState(() {
+                                              _selectedCategory = newValue!;
+                                            });
+                                          },
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
                                 SizedBox(width: 8),
                                 IconButton(
                                   icon: Icon(Icons.add),
@@ -815,7 +922,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                             )
                                 : Row(
                               children: [
-                                const Text('Category:'),
+                                const Text('Category:', style: TextStyle(fontSize: 13, color: Colors.black)),
                                 SizedBox(width: 8),
                                 IconButton(
                                   icon: Icon(Icons.add),
