@@ -545,19 +545,21 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     print("movieLabels: $movieLabels");
 
     if (movieLabels.containsKey("year")) {
-      labelWidgets.add(MovieLabel(text: movieLabels["year"]!, width: 25, height: 18, backgroundColor: Colors.grey));
+      labelWidgets.add(MovieLabel(text: movieLabels["year"]!, width: 22, height: 18, backgroundColor: Colors.grey));
     }
     if (movieLabels.containsKey("resolution")) {
       labelWidgets.add(SizedBox(width: 6));
-      labelWidgets.add(MovieLabel(text: movieLabels["resolution"]!, width: 20, height: 18, backgroundColor: Colors.deepOrangeAccent));
+      labelWidgets.add(MovieLabel(text: movieLabels["resolution"]!, width: 26, height: 18, backgroundColor: Colors.deepOrangeAccent));
     }
     if (movieLabels["remux"] == "true") {
       labelWidgets.add(SizedBox(width: 6));
-      labelWidgets.add(MovieLabel(text: "REMUX", width: 33, height: 18, backgroundColor: Colors.greenAccent));
+      labelWidgets.add(MovieLabel(text: "REMUX", width: 30, height: 18, backgroundColor: Colors.greenAccent));
     }
     if (movieLabels["bluray"] == "true") {
+      // labelWidgets.add(SizedBox(width: 6));
+      // labelWidgets.add(MovieLabel(text: "REMUX", width: 33, height: 18, backgroundColor: Colors.greenAccent));
       labelWidgets.add(SizedBox(width: 6));
-      labelWidgets.add(MovieLabel(text: "BluRay", width: 33, height: 18, backgroundColor: Colors.blue));
+      labelWidgets.add(MovieLabel(text: "BluRay", width: 30, height: 18, backgroundColor: Colors.blue));
     }
     if (movieLabels["atmos"] == "true") {
       labelWidgets.add(SizedBox(width: 6));
@@ -565,7 +567,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     }
     if (movieLabels["INT"] == "true") {
       labelWidgets.add(SizedBox(width: 6));
-      labelWidgets.add(MovieLabel(text: "INT", width: 20, height: 18, backgroundColor: Colors.purple));
+      labelWidgets.add(MovieLabel(text: "INT", width: 18, height: 18, backgroundColor: Colors.purple));
     }
 
     return InkWell(
