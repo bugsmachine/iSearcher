@@ -162,6 +162,13 @@ String getMacOSUsername() {
   return username;
 }
 
+String getDocumentsFolderPath() {
+  String homeDirectory = Platform.environment['USERPROFILE'] ?? '';
+  print(homeDirectory);
+  return '$homeDirectory\\Documents';
+}
+
+
 
 
 Future<void> cleanPosterCache() async {
