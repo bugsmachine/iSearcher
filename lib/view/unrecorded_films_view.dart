@@ -14,6 +14,8 @@ import 'package:macos_secure_bookmarks/macos_secure_bookmarks.dart';
 import '../component/modal.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../service/local_file_operation.dart';
+
 
 class UnrecordedFilmsView extends StatefulWidget {
   @override
@@ -47,6 +49,28 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   String _selectedCategory = ''; // Default category
   final List<String> _categories = [];
 
+  String _selectedFileType = 'Movie'; // Add this state variable
+
+
+  void _updateFileType(String fileType) {
+    setState(() {
+      _selectedFileType = fileType;
+    });
+  }
+
+  void _updateSubtitlePath(String? subTitlePath) {
+    setState(() {
+      _selectedSubtitlePath = subTitlePath;
+      if (subTitlePath != null) {
+        _subtitles.add(subTitlePath);
+        _subtitles = _subtitles.toSet().toList(); // Remove duplicates
+      }
+    });
+
+    print("Selected Subtitle Path: $_selectedSubtitlePath");
+    print("Subtitles: $_subtitles");
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,86 +100,96 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
   Future<void> _loadFilmsFolder() async {
-    final secureBookmarks = SecureBookmarks();
-    List <Map<String,dynamic>> allFilmFolder = await loadAllUserDefaultDESCInTime();
-    // print("allFilmFolder: $allFilmFolder");
-    String? bookmark;
-    setState(() {
-      _allFilmsFolder = allFilmFolder;
-      for (var folder in _allFilmsFolder) {
-        String fileFolder = folder['films_folder'];
-        String lastFolder = fileFolder.split(Platform.pathSeparator).last;
-        // add only if the folder is not already in the options
-        if (!_options.contains(lastFolder) && lastFolder != 'null1') {
-          _options.add(lastFolder);
-          _optionsMap[lastFolder] = [fileFolder, folder['bookMarks']];
-        }
+  final secureBookmarks = SecureBookmarks();
+  List<Map<String, dynamic>> allFilmFolder = await loadAllUserDefaultDESCInTime();
+  String? bookmark;
+
+  setState(() {
+    _allFilmsFolder = allFilmFolder;
+    for (var folder in _allFilmsFolder) {
+      String fileFolder = folder['films_folder'];
+      String lastFolder = fileFolder.split(Platform.pathSeparator).last;
+      if (!_options.contains(lastFolder) && lastFolder != 'null1') {
+        _options.add(lastFolder);
+        _optionsMap[lastFolder] = [fileFolder, folder['bookMarks']];
       }
-      // print("options: $_options");
+    }
+  });
+
+  bookmark = _allFilmsFolder[0]['bookMarks'];
+  String lastFolder = _allFilmsFolder[0]['films_folder'].split(Platform.pathSeparator).last;
+
+  if (bookmark == "bookmark_placeholder") {
+    final folder = _allFilmsFolder[0]['films_folder'];
+    String? lastFolder = folder?.split('\\').last;
+
+    setState(() {
+      _selectedOption = lastFolder;
+      _filmsFolder = folder;
+      _isLoading = true;
     });
-    bookmark = _allFilmsFolder[0]['bookMarks'];
-    String lastFolder = _allFilmsFolder[0]['films_folder'].split(Platform.pathSeparator).last;
-    if (bookmark == "bookmark_placeholder") {
-      final folder = _allFilmsFolder[0]['films_folder'];
-      // print("folder: $folder");
-      String? lastFolder = folder?.split('\\').last;
-      // print("lastFolder: $lastFolder");
+
+    await Future.delayed(Duration(milliseconds: 100)); // Yield control back to the UI thread
+    await _loadVideoFiles();
+
+    setState(() {
+      _isLoading = false;
+    });
+
+  } else if (bookmark != null && bookmark != "null1") {
+    try {
+      final resolvedFile = await secureBookmarks.resolveBookmark(bookmark);
+      List<String> folders = resolvedFile.path.split('/');
+      String lastFolder = folders[folders.length - 1];
 
       setState(() {
         _selectedOption = lastFolder;
-        _filmsFolder = folder;
-        _isLoading = true;
-      });
-      await _loadVideoFiles();
-      setState(() {
-        _isLoading = false;
       });
 
-    }else if (bookmark != null && bookmark != "null1") {
-      try{
-        final resolvedFile = await secureBookmarks.resolveBookmark(bookmark);
-        // print("resolvedFile path: ${resolvedFile.path}");
-        List<String> folders = resolvedFile.path.split('/');
-        String lastFolder = folders[folders.length - 1];
-        // print("lastFolder: $lastFolder");
+      try {
+        await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
 
         setState(() {
-          _selectedOption = lastFolder;
+          _filmsFolder = resolvedFile.path;
+          _isLoading = true;
         });
 
-        try {
-          setState(() {
-            _filmsFolder = resolvedFile.path;
-            _isLoading = true;
-          });
-          // await Future.delayed(Duration(milliseconds: 200));
-          await _loadVideoFiles();
-          setState(() {
-            _isLoading = false;
-          });
-        } finally {
-          await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
-        }
-      }on PlatformException catch(e){
-        if (e.code == 'UnexpectedError' && e.message?.contains('NSCocoaErrorDomain Code=4') == true) {
-          print("Error: The file doesn’t exist.");
-          // Handle the specific error here
+        // addSubtitleToVideo(
+        //     '/Volumes/movie-disk-1/Home Cinema/The.Wolverine.2013.1080p.BluRay.DDP7.1.x264-MOMOHD.mkv',
+        //     '/Volumes/movie-disk-1/Home Cinema/subtitle/Iron.Man.2008.US.2160p.BluRay.x265.10bit.SDR.DTS-HD.MA.TrueHD.7.1.Atmos-SWTYBLZ.zh.ass',
+        //     '/Volumes/movie-disk-1/Home Cinema/subtitle/a.mkv');
 
-          setState(() {
-            _isLoading = false;
-            _videoFiles = [VideoFile(name: "F01", path: "No such file or directory", size: -9999, lastModified: DateTime.now())];
-            _selectedOption = lastFolder;
-          });
-        } else {
-          print("Error: $e");
-        }
+        moveFile('/Volumes/movie-disk-1/Home Cinema/The.Wolverine.2013.1080p.BluRay.DDP7.1.x264-MOMOHD.mkv',
+            '/Volumes/movie-disk-1/Home Cinema/subtitle/abc.mkv');
+
+        await Future.delayed(Duration(milliseconds: 100)); // Yield control back to the UI thread
+        await _loadVideoFiles();
+
+        setState(() {
+          _isLoading = false;
+        });
+      } finally {
+        await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
       }
-    } else {
-      setState(() {
-        _filmsFolder = 'null1';
-      });
+    } on PlatformException catch (e) {
+      if (e.code == 'UnexpectedError' && e.message?.contains('NSCocoaErrorDomain Code=4') == true) {
+        print("Error: The file doesn’t exist.");
+
+        setState(() {
+          _isLoading = false;
+          _videoFiles = [VideoFile(name: "F01", path: "No such file or directory", size: -9999, lastModified: DateTime.now())];
+          _selectedOption = lastFolder;
+        });
+      } else {
+        print("Erroraaaaa: $e");
+      }
     }
+  } else {
+    setState(() {
+      _filmsFolder = 'null1';
+    });
   }
+}
 
   Future<void> _loadAllVideoFilesWindows() async {
     List<VideoFile> allList = [];
@@ -198,7 +232,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
   Future<void> _loadVideoFiles() async {
     List<VideoFile> list = await readVideoFiles(_filmsFolder!);
-
+    print(_filmsFolder);
     setState(() {
       _videoFiles = list;
     });
@@ -344,6 +378,19 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               ),
             ],
             additionalWidgets: [
+              Row(
+                children: [
+                  const Text("File detected: "),
+                  _isLoading
+                      ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                      : Text('${_videoFiles.length}'),
+                ],
+              ),
+              SizedBox(width: 16),
               IconButton(
                 icon: Icon(Icons.refresh),
                 onPressed: () {
@@ -601,6 +648,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     tagFields.add(_buildTagField(0, modalKey));
     _tagControllers.add(TextEditingController());
 
+
+
     LoadingOverlay.show(
       context,
       'Predicting Movie Detail...',
@@ -613,6 +662,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     for(var key in movieInfo.keys){
       if (key == "err") {
         print("Error predicting movie detail");
+        setState(() {
+          _selectedFileType = "video";
+        });
       }else if (key == "title") {
         filmName = movieInfo[key]!;
         filmNameController.text = filmName;
@@ -687,99 +739,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                               ],
                             ),
                             _buildNonEditableField('File Path', newFilePath, "This is the new planed file path. Original path ${videoFile.path}"),
-                            _fileType(),
+                            _fileType(_updateFileType, _updateSubtitlePath),
                             // _subtitle(),
-                            Row(
-                              children: [
-                                const Text(
-                                  "Subtitle:",
-                                  style: TextStyle(fontSize: 13, color: Colors.black),
-                                ),
-                                const SizedBox(width: 8),
-                                if (_selectedSubtitlePath == null || _selectedSubtitlePath!.isEmpty) ...[
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      FilePickerResult? result = await FilePicker.platform.pickFiles();
-                                      if (result != null) {
-                                        PlatformFile file = result.files.first;
-                                        setState(() {
-                                          _selectedSubtitlePath = file.path;
-                                          _subtitles.add(file.path!);
-                                        });
-                                        print("Subtitle path: $_selectedSubtitlePath");
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      textStyle: const TextStyle(fontSize: 10),
-                                    ),
-                                    child: const Text("Upload Subtitle"),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      // Handle search subtitle
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      textStyle: const TextStyle(fontSize: 10),
-                                    ),
-                                    child: const Text("Search Subtitle"),
-                                  ),
-                                ] else ...[
-                                  Container(
-                                    height: 36,
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.grey.shade400),
-                                      color: Colors.white,
-                                    ),
-                                    child: DropdownButtonHideUnderline(
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(maxWidth: 200), // Set the max width to 200
-                                        child: DropdownButton<String>(
-                                          isExpanded: true, // Allow DropdownButton to take full width of 200
-                                          value: _selectedSubtitlePath,
-                                          icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
-                                          dropdownColor: Colors.white,
-                                          style: TextStyle(color: Colors.black, fontSize: 14),
-                                          items: _subtitles.map<DropdownMenuItem<String>>((String value) {
-                                            String displayValue = value.split('/').last;
-                                            return DropdownMenuItem<String>(
-                                              value: value,
-                                              child: Center( // Center the text
-                                                child: Tooltip(
-                                                  message: value, // Full file path as tooltip
-                                                  waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
-                                                  child: Text(
-                                                    displayValue,
-                                                    overflow: TextOverflow.ellipsis, // Truncate long text
-                                                    maxLines: 1, // Keep text to a single line
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (String? newValue) {
-                                            setState(() {
-                                              _selectedSubtitlePath = newValue;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.manage_accounts),
-                                    onPressed: () {
-                                      // Handle manage subtitle
-                                    },
-                                  ),
-                                ],
-                              ],
-                            ),
                             _categories.isNotEmpty
                                 ? Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -1185,7 +1146,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 tagFields.removeAt(index);
                 // add an empty view at the place delete tagFileds
                 tagFields.insert(index, SizedBox.shrink()); // Add an empty view at the same index
-
+                // get the controller at the index and set the value to empty
+                _tagControllers[index].text = '';
                 // _tagControllers.removeAt(index);
               });
               // setState(() {
@@ -1201,58 +1163,180 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     );
   }
 
-  Widget _fileType() {
-    List<bool> isSelected = [true, false]; // Initial selection state
+  Widget _fileType(void Function(String) updateFileType, void Function(String?) updateSubtitlePath) {
+    List<bool> isSelected = [_selectedFileType == 'Movie', _selectedFileType == 'Video']; // Initial selection state
 
     return StatefulBuilder(
       builder: (BuildContext context, StateSetter setState) {
         return Column(
           children: [
-          Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              'Select File Type:',
-              style: TextStyle(fontSize: 13, color: Colors.black),
-            ),
-            SizedBox(width: 8),
-            ToggleButtons(
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Text('Movie'),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'Select File Type:',
+                  style: TextStyle(fontSize: 13, color: Colors.black),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Text('Video'),
+                SizedBox(width: 8),
+                ToggleButtons(
+                  children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text('Movie'),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text('Video'),
+                    ),
+                  ],
+                  isSelected: isSelected,
+                  onPressed: (int index) {
+                    setState(() {
+                      for (int i = 0; i < isSelected.length; i++) {
+                        isSelected[i] = i == index;
+                      }
+                      updateFileType(isSelected[0] ? 'Movie' : 'Video'); // Update parent state
+                      print('Selected: ${isSelected[0] ? 'Movie' : 'Video'}');
+                    });
+                  },
+                  color: Colors.black, // Color of the text when not selected
+                  selectedColor: Colors.white, // Color of the text when selected
+                  fillColor: Colors.blue, // Background color when selected
+                  borderRadius: BorderRadius.circular(8.0),
+                  constraints: BoxConstraints(minHeight: 24.0, minWidth: 44.0), // Make the buttons smaller
                 ),
+                SizedBox(width: 8),
+                if (_selectedFileType == 'Movie') _movieLabels(),
               ],
-              isSelected: isSelected,
-              onPressed: (int index) {
-                setState(() {
-                  for (int i = 0; i < isSelected.length; i++) {
-                    isSelected[i] = i == index;
-                  }
-                });
-              },
-              color: Colors.black, // Color of the text when not selected
-              selectedColor: Colors.white, // Color of the text when selected
-              fillColor: Colors.blue, // Background color when selected
-              borderRadius: BorderRadius.circular(8.0),
-              constraints: BoxConstraints(minHeight: 24.0, minWidth: 44.0), // Make the buttons smaller
             ),
-            SizedBox(width: 8),
-            _movieLabels(),
-          ],
-        ),
-          SizedBox(height: 8),
+            const SizedBox(height: 8),
+            if (_selectedFileType == 'Movie')
+              Row(
+                children: [
+                  const Text(
+                    "Subtitle:",
+                    style: TextStyle(fontSize: 13, color: Colors.black),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_selectedSubtitlePath == null || _selectedSubtitlePath!.isEmpty) ...[
+                    ElevatedButton(
+                      onPressed: () async {
+                        FilePickerResult? result = await FilePicker.platform.pickFiles();
+                        if (result != null) {
+                          PlatformFile file = result.files.first;
+                          setState(() {
+                            _selectedSubtitlePath = file.path;
+                            _subtitles.add(file.path!);
+                            _subtitles = _subtitles.toSet().toList(); // Remove duplicates
+                          });
+                          updateSubtitlePath(file.path); // Update parent state
+                          print("Subtitle path: $_selectedSubtitlePath");
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 10),
+                      ),
+                      child: const Text("Upload Subtitle"),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Handle search subtitle
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 10),
+                      ),
+                      child: const Text("Search Subtitle"),
+                    ),
+                  ] else ...[
+                    Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.grey.shade400),
+                        color: Colors.white,
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: 200), // Set the max width to 200
+                          child: DropdownButton<String>(
+                            isExpanded: true, // Allow DropdownButton to take full width of 200
+                            value: _selectedSubtitlePath,
+                            icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
+                            dropdownColor: Colors.white,
+                            style: TextStyle(color: Colors.black, fontSize: 14),
+                            items: _subtitles.map<DropdownMenuItem<String>>((String value) {
+                              String displayValue = value.split('/').last;
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Center( // Center the text
+                                  child: Tooltip(
+                                    message: value, // Full file path as tooltip
+                                    waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
+                                    child: Text(
+                                      displayValue,
+                                      overflow: TextOverflow.ellipsis, // Truncate long text
+                                      maxLines: 1, // Keep text to a single line
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                _selectedSubtitlePath = newValue;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () async {
+                        // Handle manage subtitle
+                        FilePickerResult? result = await FilePicker.platform.pickFiles();
+                        if (result != null) {
+                          PlatformFile file = result.files.first;
+                          setState(() {
+                            _selectedSubtitlePath = file.path;
+                            _subtitles.add(file.path!);
+                            _subtitles = _subtitles.toSet().toList(); // Remove duplicates
+                          });
+                          updateSubtitlePath(file.path); // Update parent state
+                          print("new Subtitle path: $_selectedSubtitlePath");
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 3),
+                    IconButton(
+                      icon: const Icon(Icons.manage_accounts),
+                      onPressed: () {
+                        // Handle manage subtitle
+                      },
+                    ),
+                    const SizedBox(width: 3),
+                    IconButton(
+                      icon: const Icon(Icons.search_rounded),
+                      onPressed: () {
+                        // Handle manage subtitle
+                      },
+                    ),
+                  ],
+                ],
+              )
+            else
+              SizedBox.shrink(),
+            SizedBox(height: 8),
           ],
         );
-
       },
     );
   }
-
 
   // Method to collect all tags
   List<List<String>> _collectInfo() {
@@ -1263,9 +1347,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     // get the category
     String category = _selectedCategory;
     String imgPath = coverImg;
+    String fileType = _selectedFileType;
+    String subtitlePath = _selectedSubtitlePath ?? '';
     List<String> movieInfo = [movieName, category, imgPath];
     info.add(movieInfo);
     info.add(tags);
+    info.add([fileType, subtitlePath]);
     return info;
   }
 

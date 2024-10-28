@@ -119,6 +119,8 @@ Future<List<VideoFile>> readVideoFiles(String path) async {
   if (videoFiles.isEmpty) {
     print("No video files found in the film_folder directory");
     return[VideoFile(name: "F02", path: "No video files found in the directory", size: -9999, lastModified: DateTime.now())];
+  }else{
+    print("video files number: ${videoFiles.length}");
   }
 
   return videoFiles; // Return the list of video files

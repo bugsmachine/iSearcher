@@ -85,6 +85,10 @@ Future<String> fetchMoviePoster(String movieTitle) async {
     if (data['results'] != null && data['results'].length > 0) {
       // Get the poster path
       final posterPath = data['results'][0]['poster_path'];
+      final id = data['results'][0]['id'];
+      print('id $id');
+      // get the path and pass to another fuc called abc()
+      // abc(posterPath);
       return 'https://image.tmdb.org/t/p/w500$posterPath';
     } else {
       // No poster found, return error image

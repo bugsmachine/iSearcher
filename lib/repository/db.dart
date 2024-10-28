@@ -9,7 +9,7 @@ Future<void> initDatabase() async {
   print("initDatabase");
   db = await openDatabase(
     join(await getDatabasesPath(), 'movies_database.db'),
-    version: 33, // Increment the version number
+    version: 34, // Increment the version number
     onCreate: (db, version) {
       print("onCreate");
       return db.transaction((txn) async {

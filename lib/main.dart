@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:ffmpeg_kit_flutter/ffmpeg_kit_config.dart';
 import 'package:flutter/material.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import 'package:home_cinema_app/view/all_movies_view.dart';
@@ -22,11 +23,11 @@ void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // IGNORE THIS IN MACOS
-  // Initialize FFI
-  sqfliteFfiInit();
-
-  // Set the database factory
-  databaseFactory = databaseFactoryFfi;
+  // // Initialize FFI
+  // sqfliteFfiInit();
+  //
+  // // Set the database factory
+  // databaseFactory = databaseFactoryFfi;
 
   if (args.isNotEmpty && args.first == 'multi_window') {
     final windowId = int.parse(args[1]);
@@ -72,6 +73,7 @@ void main(List<String> args) async {
     }
   }
 
+  await FFmpegKitConfig.init();
   runApp(const MyApp());
 
   // await executePythonScript();

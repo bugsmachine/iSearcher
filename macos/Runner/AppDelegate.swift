@@ -50,6 +50,23 @@ import Foundation
         print("App Version: \(appVersion)")
         
         
+        // handel the help menu
+        let helpMenu = mainMenu?.items.last?.submenu
+        // add the iSearcher Help menu item which click will lead to open the website page in browser
+        let helpMenuItem = NSMenuItem(title: "iSearcher Help", action: #selector(openHelpPage), keyEquivalent: "")
+        helpMenu?.addItem(helpMenuItem)
+        // add a separator
+        helpMenu?.addItem(NSMenuItem.separator())
+        // add the Released Version menu item
+        let versionMenuItem = NSMenuItem(title: "Release Notes", action: #selector(openHelpPage), keyEquivalent: "")
+        helpMenu?.addItem(versionMenuItem)
+        // add the github page link
+        let githubMenuItem = NSMenuItem(title: "Github Page", action: #selector(openHelpPage), keyEquivalent: "")
+        helpMenu?.addItem(githubMenuItem)
+        helpMenu?.addItem(NSMenuItem.separator())
+        let reportIssueMenuItem = NSMenuItem(title: "Report Issue", action: #selector(openHelpPage), keyEquivalent: "")
+        helpMenu?.addItem(reportIssueMenuItem)
+        
 
     }
 
@@ -72,6 +89,14 @@ import Foundation
         }
     }
 
+    @objc func openHelpPage() {
+
+        // open the link in browser
+        if let url = URL(string: "https://github.com/bugsmachine/iSearcher") {
+            NSWorkspace.shared.open(url)
+        }
+        
+    }
     
 
     // Action to trigger Sparkle's update check

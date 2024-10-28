@@ -42,6 +42,7 @@ dependencies:
   shelf: ^1.4.1
   shelf_router: ^1.0.0
   path_provider: ^2.0.11
+  ffmpeg_kit_flutter: ^6.0.3
   flutter:
     sdk: flutter
 

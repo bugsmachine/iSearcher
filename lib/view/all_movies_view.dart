@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:home_cinema_app/service/local_file_operation.dart';
 import '../component/inner_top_bar.dart'; // Adjust the path as necessary
 
 class AllMoviesView extends StatefulWidget {
@@ -10,6 +11,13 @@ class _AllMoviesViewState extends State<AllMoviesView> {
   final TextEditingController _searchController = TextEditingController();
   String? _selectedOption = 'Option 11111'; // Initialize with a default selected option
   final List<String> _options = ['Option 11111', 'Option 2ss', 'Option 3']; // Dropdown options
+
+
+  @override
+  void initState() {
+    super.initState();
+  }
+  
 
   @override
   Widget build(BuildContext context) {

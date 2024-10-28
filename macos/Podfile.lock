@@ -3,6 +3,13 @@ PODS:
     - FlutterMacOS
   - desktop_multi_window (0.0.1):
     - FlutterMacOS
+  - ffmpeg-kit-macos-https (6.0)
+  - ffmpeg_kit_flutter (6.0.3):
+    - ffmpeg_kit_flutter/https (= 6.0.3)
+    - FlutterMacOS
+  - ffmpeg_kit_flutter/https (6.0.3):
+    - ffmpeg-kit-macos-https (= 6.0)
+    - FlutterMacOS
   - FlutterMacOS (1.0.0)
   - macos_secure_bookmarks (0.0.3):
     - FlutterMacOS
@@ -23,6 +30,7 @@ PODS:
 DEPENDENCIES:
   - bitsdojo_window_macos (from `Flutter/ephemeral/.symlinks/plugins/bitsdojo_window_macos/macos`)
   - desktop_multi_window (from `Flutter/ephemeral/.symlinks/plugins/desktop_multi_window/macos`)
+  - ffmpeg_kit_flutter (from `Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - macos_secure_bookmarks (from `Flutter/ephemeral/.symlinks/plugins/macos_secure_bookmarks/macos`)
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
@@ -34,6 +42,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - ffmpeg-kit-macos-https
     - Sparkle
 
 EXTERNAL SOURCES:
@@ -41,6 +50,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/bitsdojo_window_macos/macos
   desktop_multi_window:
     :path: Flutter/ephemeral/.symlinks/plugins/desktop_multi_window/macos
+  ffmpeg_kit_flutter:
+    :path: Flutter/ephemeral/.symlinks/plugins/ffmpeg_kit_flutter/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
   macos_secure_bookmarks:
@@ -59,6 +70,8 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   bitsdojo_window_macos: 44e3b8fe3dd463820e0321f6256c5b1c16bb6a00
   desktop_multi_window: 566489c048b501134f9d7fb6a2354c60a9126486
+  ffmpeg-kit-macos-https: 60de703db964ccca7fd0d4d1611f4c102a8139cc
+  ffmpeg_kit_flutter: 5bd75928cf88ec177cea410b027681e4bfe09452
   FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
   macos_secure_bookmarks: cff041c4b377fa00941bb901aaec4d27fac5edf2
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
@@ -68,6 +81,6 @@ SPEC CHECKSUMS:
   url_launcher_macos: c82c93949963e55b228a30115bd219499a6fe404
   window_manager: 3a1844359a6295ab1e47659b1a777e36773cd6e8
 
-PODFILE CHECKSUM: b38706485541def97359f09b4c9f5877cd7640ab
+PODFILE CHECKSUM: e2e43a47515c5e4491d28714f66a623cf1ab4554
 
 COCOAPODS: 1.14.3
