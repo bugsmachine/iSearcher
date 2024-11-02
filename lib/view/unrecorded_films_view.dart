@@ -301,7 +301,17 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         setState(() {
           _isLoading = true;
         });
-        await _loadVideoFiles();
+        if(_platform == 'macos'){
+          final secureBookmarks = SecureBookmarks();
+          String? bookmark = _optionsMap[_selectedOption]?[1];
+          final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
+          await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+          try {
+            await _loadVideoFiles();
+          } finally {
+            await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+          }
+        }
         setState(() {
           _isLoading = false;
         });
@@ -518,7 +528,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   ),
                                   SizedBox(height: 4),
                                   Text(
-                                    'Size: ${videoFile.size >= 1024 * 1024 * 1024 ? (videoFile.size / 1024 / 1024 / 1024).toStringAsFixed(2) + " GB" : (videoFile.size / 1024 / 1024).toStringAsFixed(2) + " MB"}',
+                                    'Size: ${videoFile.size >= 1000 * 1000 * 1000 ? (videoFile.size / 1000 / 1000 / 1000).toStringAsFixed(2) + " GB" : (videoFile.size / 1024 / 1024).toStringAsFixed(2) + " MB"}',
                                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                                   ),
                                   Text(
@@ -648,6 +658,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     tagFields.add(_buildTagField(0, modalKey));
     _tagControllers.add(TextEditingController());
 
+    String movieID = "";
+
 
 
     LoadingOverlay.show(
@@ -686,12 +698,19 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         movieLabels["atmos"] = movieInfo[key]!;
       }else if (key == "isINT") {
         movieLabels["INT"] = movieInfo[key]!;
+      }else if (key == "movieID") {
+        movieID = movieInfo[key]!;
       }
     }
 
     String newFilePath = '${_filmsFolder!}/recorded_films/$filmName/${videoFile.name}';
 
     LoadingOverlay.hide(context);
+
+    List<String> genres = await fetchMovieGenres(movieID);
+    print("genres: $genres");
+    List<String> keywords = await fetchMovieKeywords(movieID);
+    print("keywords: $keywords");
 
     CustomModal.show(
       context,

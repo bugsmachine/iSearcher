@@ -57,7 +57,16 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
 
   print(searchTitle);
   // Fetch movie poster
-  String posterUrl = await fetchMoviePoster(searchTitle);
+  List<dynamic> details = await fetchMoviePoster(searchTitle);
+  String posterUrl = "";
+  String movieID = "";
+
+  if(details.length != 0){
+    posterUrl = details[0];
+    movieID = details[1].toString();
+  }
+
+  print(details);
 
   return {
     'title': title,
@@ -70,14 +79,15 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
     'isBluRay': isBluRay.toString(),
     'isAtmos': isAtmos.toString(),
     'isINT': isINT.toString(),
-    'posterUrl': posterUrl
+    'posterUrl': posterUrl,
+    'movieID': movieID
   };
 }
 
-Future<String> fetchMoviePoster(String movieTitle) async {
+Future<List<dynamic>> fetchMoviePoster(String movieTitle) async {
   final apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
   final url = Uri.parse('https://api.themoviedb.org/3/search/movie?api_key=$apiKey&query=$movieTitle');
-
+  List<dynamic> movieDetails = [];
   final response = await http.get(url);
 
   if (response.statusCode == 200) {
@@ -88,17 +98,53 @@ Future<String> fetchMoviePoster(String movieTitle) async {
       final id = data['results'][0]['id'];
       print('id $id');
       // get the path and pass to another fuc called abc()
-      // abc(posterPath);
-      return 'https://image.tmdb.org/t/p/w500$posterPath';
+      movieDetails.add('https://image.tmdb.org/t/p/w500$posterPath');
+      movieDetails.add(id);
+      return movieDetails;
     } else {
       // No poster found, return error image
-      return 'https://via.placeholder.com/500?text=No+Poster+Found';
+      return movieDetails;
     }
   } else {
     // Error during the API call, return error image
-    return 'https://via.placeholder.com/500?text=Error+Fetching+Poster';
+    return movieDetails;
   }
 }
+
+Future<List<String>> fetchMovieKeywords(String movieID) async {
+  const apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+  //sample https://api.themoviedb.org/3/movie/320288/keywords?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb
+  final url = Uri.parse('https://api.themoviedb.org/3/movie/$movieID/keywords?api_key=$apiKey');
+  final response = await http.get(url);
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    if (data['keywords'] != null && data['keywords'].length > 0) {
+      final keywords = data['keywords'];
+      return List<String>.from(keywords.map((keyword) => keyword['name']));
+    }
+  }
+
+  return [];
+}
+
+Future<List<String>> fetchMovieGenres(String movieID) async {
+  // sample https://api.themoviedb.org/3/movie/320288?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb
+  const apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+  final url = Uri.parse('https://api.themoviedb.org/3/movie/$movieID?api_key=$apiKey');
+  final response = await http.get(url);
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    if (data['genres'] != null && data['genres'].length > 0) {
+      final genres = data['genres'];
+      return List<String>.from(genres.map((genre) => genre['name']));
+    }
+  }
+
+  return [];
+}
+
 
 Map<String, String> cleanTitle(String title) {
   RegExp volPattern = RegExp(r'vol\s*\d+', caseSensitive: false);

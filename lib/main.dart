@@ -11,6 +11,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
+import 'component/pop_up_menu.dart';
 import 'repository/db.dart';
 import 'service/main_service.dart';
 import 'package:home_cinema_app/app_config/colors.dart';
@@ -371,12 +372,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       child: Row(
         children: [
           const SizedBox(width: 5),
-          IconButton(
-            icon: Icon(Icons.filter_list, color: Colors.grey[105]),
-            onPressed: () {
-              print("Filter icon clicked!");
-            },
-          ),
+          CustomPopupMenuButton(),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
