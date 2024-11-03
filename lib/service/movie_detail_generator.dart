@@ -10,15 +10,31 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
   List<String> movieInfo = movieName.split(".");
   int movieYearIndex = movieInfo.indexWhere((info) => RegExp(r'^\d{4}$').hasMatch(info));
 
+  String volume = "";
+  String season = "";
+  String episode = "";
+  int type = 0;
+
+  if (movieInfo.any((info) => RegExp(r'^S\d{2}E\d{2}$').hasMatch(info))) {
+    type = 1;
+    String seasonEpisode = movieInfo.firstWhere((info) => RegExp(r'^S\d{2}E\d{2}$').hasMatch(info));
+    RegExpMatch? match = RegExp(r'^S(\d{2})E(\d{2})$').firstMatch(seasonEpisode);
+    if (match != null) {
+      season = match.group(1)!;
+      episode = match.group(2)!;
+      print('Season: $season, Episode: $episode');
+    }
+  }
+
   if (movieYearIndex == -1) {
     return {"err": "Error predicting movie detail"};
   }
 
   String title = movieInfo.sublist(0, movieYearIndex).join(" ");
-  String volume = "";
-  String season = "";
-  String episode = "";
+
   Map<String, String> cleanedTitle = cleanTitle(title);
+
+  print(cleanedTitle);
 
   for (var key in cleanedTitle.keys) {
     if (key == "volume") {
@@ -49,15 +65,13 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
 
 
   String searchTitle = title;
-  if (season != "") {
-    searchTitle += " season $season";
-  }else if(volume != ""){
+  if(volume != ""){
     searchTitle += " Vol. $volume";
   }
 
   print(searchTitle);
   // Fetch movie poster
-  List<dynamic> details = await fetchMoviePoster(searchTitle);
+  List<dynamic> details = await fetchMoviePoster(searchTitle, type);
   String posterUrl = "";
   String movieID = "";
 
@@ -80,13 +94,17 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
     'isAtmos': isAtmos.toString(),
     'isINT': isINT.toString(),
     'posterUrl': posterUrl,
-    'movieID': movieID
+    'movieID': movieID,
+    'type': type.toString()
   };
 }
 
-Future<List<dynamic>> fetchMoviePoster(String movieTitle) async {
+Future<List<dynamic>> fetchMoviePoster(String movieTitle, int type) async {
   final apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
-  final url = Uri.parse('https://api.themoviedb.org/3/search/movie?api_key=$apiKey&query=$movieTitle');
+  var url = Uri.parse('https://api.themoviedb.org/3/search/movie?api_key=$apiKey&query=$movieTitle');
+  if (type == 1) {
+    url = Uri.parse('https://api.themoviedb.org/3/search/tv?api_key=$apiKey&query=$movieTitle');
+  }
   List<dynamic> movieDetails = [];
   final response = await http.get(url);
 
@@ -111,40 +129,88 @@ Future<List<dynamic>> fetchMoviePoster(String movieTitle) async {
   }
 }
 
-Future<List<String>> fetchMovieKeywords(String movieID) async {
+Future<List<String>> fetchMovieKeywords(String movieID, String type) async {
   const apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
   //sample https://api.themoviedb.org/3/movie/320288/keywords?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb
-  final url = Uri.parse('https://api.themoviedb.org/3/movie/$movieID/keywords?api_key=$apiKey');
+  var url = Uri.parse('https://api.themoviedb.org/3/movie/$movieID/keywords?api_key=$apiKey');
+  if(type == "1"){
+    url = Uri.parse('https://api.themoviedb.org/3/tv/$movieID/keywords?api_key=$apiKey');
+  }
   final response = await http.get(url);
 
   if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    if (data['keywords'] != null && data['keywords'].length > 0) {
-      final keywords = data['keywords'];
-      return List<String>.from(keywords.map((keyword) => keyword['name']));
+    if (type == "1") {
+      final data = json.decode(response.body);
+      if (data['results'] != null && data['results'].length > 0) {
+        final keywords = data['results'];
+        return List<String>.from(keywords.map((keyword) => keyword['name']));
+      }
+    }else{
+      final data = json.decode(response.body);
+      if (data['keywords'] != null && data['keywords'].length > 0) {
+        final keywords = data['keywords'];
+        return List<String>.from(keywords.map((keyword) => keyword['name']));
+      }
     }
+
   }
 
   return [];
 }
 
-Future<List<String>> fetchMovieGenres(String movieID) async {
+Future<List<List<String>>> fetchMovieGenresAndOverview(String movieID, String type) async {
   // sample https://api.themoviedb.org/3/movie/320288?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb
   const apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
-  final url = Uri.parse('https://api.themoviedb.org/3/movie/$movieID?api_key=$apiKey');
+  var url = Uri.parse('https://api.themoviedb.org/3/movie/$movieID?api_key=$apiKey');
+  if(type == "1"){
+    url = Uri.parse('https://api.themoviedb.org/3/tv/$movieID?api_key=$apiKey');
+    }
   final response = await http.get(url);
+
+  List<List<String>> genresAndOverview = [];
 
   if (response.statusCode == 200) {
     final data = json.decode(response.body);
     if (data['genres'] != null && data['genres'].length > 0) {
       final genres = data['genres'];
-      return List<String>.from(genres.map((genre) => genre['name']));
+       genresAndOverview.add(List<String>.from(genres.map((genre) => genre['name'])));
+    }
+    if (data['overview'] != null) {
+      genresAndOverview.add([data['overview']]);
     }
   }
 
-  return [];
+  return genresAndOverview;
 }
 
+
+
+Future<List<Map<String, String>>> fetchMovieCast(String movieID, String type) async {
+  const apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+  var url = Uri.parse('https://api.themoviedb.org/3/movie/$movieID/credits?api_key=$apiKey');
+  if(type == "1"){
+    url = Uri.parse('https://api.themoviedb.org/3/tv/$movieID/credits?api_key=$apiKey');
+  }
+  final response = await http.get(url);
+
+  List<Map<String, String>> cast = [];
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    if (data['cast'] != null && data['cast'].length > 0) {
+      final casts = data['cast'];
+      for (int i = 0; i < casts.length && i < 10; i++) {
+        cast.add({
+          'name': casts[i]['name'],
+          'profile_path': casts[i]['profile_path'] ?? '',
+          'character': casts[i]['character'] ?? '',
+        });
+      }
+    }
+  }
+
+  return cast;
+}
 
 Map<String, String> cleanTitle(String title) {
   RegExp volPattern = RegExp(r'vol\s*\d+', caseSensitive: false);
@@ -158,10 +224,11 @@ Map<String, String> cleanTitle(String title) {
     };
   } else if (seasonPattern.hasMatch(title)) {
     String seasonEpisode = seasonPattern.firstMatch(title)!.group(0)!;
+    print("Season Episode: $seasonEpisode");
     return {
       "title": title.split(seasonPattern)[0].trim(),
-      "season": seasonEpisode.split('e')[0].substring(1), // Extract season number
-      "episode": seasonEpisode.split('e')[1] // Extract episode number
+      "season": seasonEpisode.substring(1, 3), // Extract season number
+      "episode": seasonEpisode.substring(4) // Extract episode number
     };
   } else {
     return {"title": title};

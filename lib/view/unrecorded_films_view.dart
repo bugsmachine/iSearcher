@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:home_cinema_app/component/overlay.dart';
 import 'package:home_cinema_app/service/main_service.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import '../component/inner_top_bar.dart';
+import '../component/tags.dart';
 import '../main.dart';
 import '../repository/db.dart';
 import '../models/video_file.dart';
@@ -23,6 +25,7 @@ class UnrecordedFilmsView extends StatefulWidget {
 }
 
 class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
+  bool _tagsAdded = false;
   Map<String,String> movieLabels = {};
   String? _filmsFolder;
   String? _selectedOption = 'All Folder';
@@ -50,6 +53,75 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   final List<String> _categories = [];
 
   String _selectedFileType = 'Movie'; // Add this state variable
+
+  String _movieOverview = '';
+
+  final List<Color> lightColors = [
+    Colors.red.shade200,
+    Colors.pink.shade200,
+    Colors.purple.shade200,
+    Colors.deepPurple.shade200,
+    Colors.indigo.shade200,
+    Colors.blue.shade200,
+    Colors.lightBlue.shade200,
+    Colors.cyan.shade200,
+    Colors.teal.shade200,
+    Colors.green.shade200,
+    Colors.lightGreen.shade200,
+    Colors.lime.shade200,
+    Colors.yellow.shade200,
+    Colors.amber.shade200,
+    Colors.orange.shade200,
+    Colors.deepOrange.shade200,
+
+    // Additional light colors
+    Colors.brown.shade200,
+    Colors.grey.shade200,
+    Colors.blueGrey.shade200,
+    Colors.pink.shade100,
+    Colors.purple.shade100,
+    Colors.deepPurple.shade100,
+    Colors.indigo.shade100,
+    Colors.blue.shade100,
+    Colors.cyan.shade100,
+    Colors.teal.shade100,
+    Colors.green.shade100,
+    Colors.lightGreen.shade100,
+    Colors.yellow.shade100,
+    Colors.amber.shade100,
+    Colors.orange.shade100,
+    Colors.deepOrange.shade100,
+    Colors.brown.shade100,
+  ];
+
+  List<Map<String, dynamic>> tagsWithColors = [
+    // {"tag": "Pineapple", "color": Colors.orange.shade200},
+    // {"tag": "Lemons", "color": Colors.yellow.shade300},
+    // {"tag": "Watermelon", "color": Colors.green.shade200},
+  ];
+
+
+
+  void addTag(String tag, [Color? color]) {
+    setState(() {
+      tagsWithColors.add({
+        'tag': tag,
+        'color': color ?? _getRandomColor(),
+      });
+    });
+  }
+
+  void addOverview(String overview) {
+    setState(() {
+      _movieOverview = overview;
+    });
+  }
+
+  Color _getRandomColor() {
+    // Generate a random color
+    final Random random = Random();
+    return lightColors[random.nextInt(lightColors.length)];
+  }
 
 
   void _updateFileType(String fileType) {
@@ -639,10 +711,27 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
 
+  Future<Map<String, dynamic>> _loadMovieDetails(String movieID, String type) async {
+
+    List<List<String>> genres = await fetchMovieGenresAndOverview(movieID,type);
+    List<String> keywords = await fetchMovieKeywords(movieID,type);
+    List<Map<String, String>> cast = await fetchMovieCast(movieID,type);
+
+    return {
+      'genres': genres,
+      'keywords': keywords,
+      'cast': cast,
+    };
+  }
+
+
 
   Future<void> _showEditFilmDetailsModal(BuildContext context, VideoFile videoFile) async {
     setState(() {
       coverImg = "";
+      _tagsAdded = false; // Reset the flag here
+      tagsWithColors.clear();
+      _movieOverview = "";
     });
     String imagePath = '';
     GlobalKey<State> modalKey = GlobalKey<State>();
@@ -659,8 +748,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     _tagControllers.add(TextEditingController());
 
     String movieID = "";
-
-
+    String type = "0";
 
     LoadingOverlay.show(
       context,
@@ -671,35 +759,37 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     Map<String, String?> movieInfo = await predictMovieDetail(videoFile.name);
     print("movieInfo: $movieInfo");
-    for(var key in movieInfo.keys){
+    for (var key in movieInfo.keys) {
       if (key == "err") {
         print("Error predicting movie detail");
         setState(() {
           _selectedFileType = "video";
         });
-      }else if (key == "title") {
+      } else if (key == "title") {
         filmName = movieInfo[key]!;
         filmNameController.text = filmName;
-      }else if (key == "posterUrl") {
+      } else if (key == "posterUrl") {
         imagePath = movieInfo[key]!;
         print("imagePath: $imagePath");
         setState(() {
           coverImg = imagePath;
         });
-      }else if(key == "year"){
+      } else if (key == "year") {
         movieLabels["year"] = movieInfo[key]!;
-      }else if (key == "resolution") {
+      } else if (key == "resolution") {
         movieLabels["resolution"] = movieInfo[key]!;
-      }else if (key == "isRemux") {
+      } else if (key == "isRemux") {
         movieLabels["remux"] = movieInfo[key]!;
-      }else if (key == "isBluRay") {
+      } else if (key == "isBluRay") {
         movieLabels["bluray"] = movieInfo[key]!;
-      }else if (key == "isAtmos") {
+      } else if (key == "isAtmos") {
         movieLabels["atmos"] = movieInfo[key]!;
-      }else if (key == "isINT") {
+      } else if (key == "isINT") {
         movieLabels["INT"] = movieInfo[key]!;
-      }else if (key == "movieID") {
+      } else if (key == "movieID") {
         movieID = movieInfo[key]!;
+      }else if(key == "type"){
+        type = movieInfo[key]!;
       }
     }
 
@@ -707,17 +797,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     LoadingOverlay.hide(context);
 
-    List<String> genres = await fetchMovieGenres(movieID);
-    print("genres: $genres");
-    List<String> keywords = await fetchMovieKeywords(movieID);
-    print("keywords: $keywords");
-
     CustomModal.show(
       context,
       'Edit Film Details',
       StatefulBuilder(
         key: modalKey,
-        builder: (BuildContext context, StateSetter setState) {
+        builder: (BuildContext context, StateSetter modalSetState) {
           return Container(
             width: 600,
             child: SingleChildScrollView(
@@ -751,61 +836,69 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   ),
                                 ),
                                 SizedBox(width: 8),
-                                Text(
-                                  fileExtension,
-                                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                                ),
+                                // Text(
+                                //   fileExtension,
+                                //   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                                // ),
+                                Tooltip(
+                                  message: 'Search detail information for the movie: $filmName',
+                                  child: IconButton(
+                                    icon: Icon(Icons.search_rounded),
+                                    onPressed: () {
+                                      print("Search for movie detail");
+                                    },
+                                  ),
+                                )
                               ],
                             ),
-                            _buildNonEditableField('File Path', newFilePath, "This is the new planed file path. Original path ${videoFile.path}"),
+                            _buildNonEditableField('File Path', newFilePath, "This is the new planned file path. Original path ${videoFile.path}"),
                             _fileType(_updateFileType, _updateSubtitlePath),
-                            // _subtitle(),
                             _categories.isNotEmpty
                                 ? Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  const Text('Category:', style: TextStyle(fontSize: 13, color: Colors.black)),
-                                  SizedBox(width: 8),
-                                  Container(
-                                    height: 36,
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.grey.shade400),
-                                      color: Colors.white,
-                                    ),
-                                    child: DropdownButtonHideUnderline(
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(maxWidth: 100), // Set the max width to 200
-                                        child: DropdownButton<String>(
-                                          isExpanded: true, // Allow DropdownButton to take full width of 200
-                                          value: _selectedCategory,
-                                          icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
-                                          dropdownColor: Colors.white,
-                                          style: TextStyle(color: Colors.black, fontSize: 14),
-                                          items: _categories.map<DropdownMenuItem<String>>((String value) {
-                                            return DropdownMenuItem<String>(
-                                              value: value,
-                                              child: Tooltip(
-                                                message: value, // Show full text on hover
-                                                waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
-                                                child: Text(
-                                                  value,
-                                                  overflow: TextOverflow.ellipsis, // Truncate long text
-                                                  maxLines: 1, // Keep text to a single line
-                                                ),
+                              children: [
+                                const Text('Category:', style: TextStyle(fontSize: 13, color: Colors.black)),
+                                SizedBox(width: 8),
+                                Container(
+                                  height: 36,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.grey.shade400),
+                                    color: Colors.white,
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(maxWidth: 100), // Set the max width to 200
+                                      child: DropdownButton<String>(
+                                        isExpanded: true, // Allow DropdownButton to take full width of 200
+                                        value: _selectedCategory,
+                                        icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
+                                        dropdownColor: Colors.white,
+                                        style: TextStyle(color: Colors.black, fontSize: 14),
+                                        items: _categories.map<DropdownMenuItem<String>>((String value) {
+                                          return DropdownMenuItem<String>(
+                                            value: value,
+                                            child: Tooltip(
+                                              message: value, // Show full text on hover
+                                              waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
+                                              child: Text(
+                                                value,
+                                                overflow: TextOverflow.ellipsis, // Truncate long text
+                                                maxLines: 1, // Keep text to a single line
                                               ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (String? newValue) {
-                                            setState(() {
-                                              _selectedCategory = newValue!;
-                                            });
-                                          },
-                                        ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: (String? newValue) {
+                                          setState(() {
+                                            _selectedCategory = newValue!;
+                                          });
+                                        },
                                       ),
                                     ),
                                   ),
+                                ),
                                 SizedBox(width: 8),
                                 IconButton(
                                   icon: Icon(Icons.add),
@@ -952,6 +1045,98 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 ),
                               ],
                             ),
+                            SizedBox(height: 10),
+                            StatefulBuilder(
+                              builder: (BuildContext context, StateSetter setState) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!_tagsAdded)
+                                    // Show loading animation when no tags
+                                      Container(
+                                        padding: EdgeInsets.symmetric(vertical: 10),
+                                        child: Center(
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                width: 24,
+                                                height: 24,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                                ),
+                                              ),
+                                              SizedBox(height: 8),
+                                              Text(
+                                                'Loading tags...',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Tags(
+                                        tagsWithColors: tagsWithColors,
+                                        onRemove: (tag) {
+                                          setState(() {
+                                            tagsWithColors.removeWhere((tagData) => tagData['tag'] == tag);
+                                          });
+                                        },
+                                      ),
+
+                                    // Align the add icon to the left
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.add),
+                                        onPressed: () {
+                                          TextEditingController newTagController = TextEditingController();
+
+                                          CustomModal.show(
+                                            context,
+                                            'Add New Tag',
+                                            StatefulBuilder(
+                                              builder: (BuildContext context, StateSetter modalSetState) {
+                                                return TextField(
+                                                  controller: newTagController,
+                                                  decoration: InputDecoration(
+                                                    labelText: 'Tag Name',
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                            [
+                                              TextButton(
+                                                child: Text('Cancel'),
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                              TextButton(
+                                                child: Text('Create'),
+                                                onPressed: () {
+                                                  String newTagName = newTagController.text.trim();
+                                                  if (newTagName.isNotEmpty) {
+                                                    setState(() {
+                                                      addTag(newTagName);
+                                                    });
+                                                  }
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -975,6 +1160,39 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                       _movieImageBox(),
                     ],
                   ),
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: _loadMovieDetails(movieID, type),
+                    builder: (BuildContext context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error loading movie details'));
+                      } else if (snapshot.hasData) {
+                        var movieDetails = snapshot.data!;
+                        var genres = movieDetails['genres'] as List<List<String>>;
+                        var keywords = movieDetails['keywords'] as List<String>;
+                        var cast = movieDetails['cast'] as List<Map<String, String>>;
+
+                        String overview = genres[1][0];
+
+                        // Schedule the addition of tags after the build phase
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _addTags(keywords, overview, modalSetState);  // Pass the modalSetState
+                        });
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Genres: ${genres.join(', ')}'),
+                            Text('Keywords: ${keywords.join(', ')}'),
+                            Text('Cast: ${cast.map((c) => c['name']).join(', ')}'),
+                          ],
+                        );
+                      } else {
+                        return Center(child: Text('No movie details available'));
+                      }
+                    },
+                  )
                 ],
               ),
             ),
@@ -999,6 +1217,20 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       height: 400,
     );
   }
+
+  void _addTags(List<String> keywords, String overview, StateSetter modalSetState) {
+    if (!_tagsAdded) {
+      modalSetState(() {
+        for (var keyword in keywords) {
+          addTag(keyword);
+        }
+        addOverview(overview);
+        _tagsAdded = true;
+      });
+    }
+  }
+
+
 
   Widget _movieImageBox() {
     final imageDownloader = ImageDownloader();
@@ -1351,8 +1583,47 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
             else
               SizedBox.shrink(),
             SizedBox(height: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Overview:',
+                      style: TextStyle(fontSize: 13, color: Colors.black),
+                    ),
+                    SizedBox(width: 8),
+                    _movieOverview.isEmpty
+                        ? Row(
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2.0),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Loading overview, please wait...',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        ),
+                      ],
+                    )
+                        : SizedBox.shrink(),
+                  ],
+                ),
+                if (_movieOverview.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1.0),
+                    child: Text(
+                      _movieOverview,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                  ),
+              ],
+            ),
           ],
         );
+
       },
     );
   }

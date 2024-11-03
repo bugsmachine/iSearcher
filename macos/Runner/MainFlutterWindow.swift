@@ -124,7 +124,7 @@ class MainFlutterWindow: NSWindow {
         }
         
         let imageURL = imgDir.appendingPathComponent(imageName)
-        if( FileManager.default.fileExists(atPath: imageURL.path) ){
+        if(FileManager.default.fileExists(atPath: imageURL.path) ){
 //            print("Image already exists in Documents: \(imageURL.path)")
             if let imageData = try? Data(contentsOf: imageURL) {
                 // Return the image data as a base64 encoded string
@@ -169,8 +169,18 @@ class MainFlutterWindow: NSWindow {
                         result(FlutterError(code: "IMAGE_LOAD_ERROR", message: "Could not load image", details: nil))
                     }
                 } catch {
-                    // Handle errors during the file move operation
-                    result(FlutterError(code: "FILE_MOVE_ERROR", message: error.localizedDescription, details: nil))
+                    if (error as NSError).code == NSFileWriteFileExistsError {
+                        // File already exists, return the existing image data
+                        if let imageData = try? Data(contentsOf: imageURL) {
+                            let base64String = imageData.base64EncodedString()
+                            result(base64String)
+                        } else {
+                            result(FlutterError(code: "IMAGE_LOAD_ERROR", message: "Could not load existing image", details: nil))
+                        }
+                    } else {
+                        // Handle other errors during the file move operation
+                        result(FlutterError(code: "FILE_MOVE_ERROR", message: error.localizedDescription, details: nil))
+                    }
                 }
             }
             // Start the download task
