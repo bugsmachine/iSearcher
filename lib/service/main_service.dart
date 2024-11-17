@@ -69,7 +69,7 @@ Future<void> appConfigInit(String path) async {
 
 // sync the database with the txt files
 Future<void> syncDatabase(String path) async {
-  String lastAPPWrite = await getConfig("last_write_config_time");
+  String? lastAPPWrite = await getConfig("last_write_config_time");
 }
 
 // write data to the txt file

@@ -113,6 +113,7 @@ class MainFlutterWindow: NSWindow {
         // check if the file already exists in the Documents directory
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let imgDir = documentsDirectory.appendingPathComponent("Posters")
+        
         // check if exists, create if not
         if !FileManager.default.fileExists(atPath: imgDir.path) {
             do {

@@ -8,7 +8,7 @@
 PRODUCT_NAME = iSearcher
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = top.homecinema.homeCinemaApp
+PRODUCT_BUNDLE_IDENTIFIER = top.bugsmachine.iSearcher
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2024 top.homecinema. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2024 bugsmachine. All rights reserved.

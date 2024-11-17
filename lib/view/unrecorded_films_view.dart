@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:home_cinema_app/component/movie_label.dart';
 import 'package:home_cinema_app/component/overlay.dart';
+import 'package:home_cinema_app/service/db_ansy.dart';
 import 'package:home_cinema_app/service/main_service.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import '../component/inner_top_bar.dart';
@@ -15,6 +17,7 @@ import '../models/video_file.dart';
 import 'package:macos_secure_bookmarks/macos_secure_bookmarks.dart';
 import '../component/modal.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 
 import '../service/local_file_operation.dart';
 
@@ -38,6 +41,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   String? _platform;
   String? _selectedSubtitlePath = "";
   List<String> _subtitles = [];
+
+  List<Map<String, String>> _cast = [];
+
+
 
   // a map to hold the options and their values, default is 'All Folder': 'All Folder'
   Map<String, List<String>> _optionsMap = {'All Folder': ['All Folder', 'All Folder']};
@@ -100,6 +107,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     // {"tag": "Watermelon", "color": Colors.green.shade200},
   ];
 
+  List<Map<String, dynamic>> genresWithColors = [
+
+  ];
+
 
 
   void addTag(String tag, [Color? color]) {
@@ -108,6 +119,21 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         'tag': tag,
         'color': color ?? _getRandomColor(),
       });
+    });
+  }
+
+  void addGenres(String genre) {
+    setState(() {
+      genresWithColors.add({
+        'tag': genre,
+        'color': Colors.brown.shade200,
+      });
+    });
+  }
+
+  void addCast(List<Map<String,String>> casts){
+    setState(() {
+      _cast = casts;
     });
   }
 
@@ -148,24 +174,48 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     super.initState();
     _loadFilmsFolder();
     _loadOther();
+    check();
   }
+
+  Future<void> check() async {
+  var bookmarks = SecureBookmarks();
+  var permission = await getConfig("library_permission");
+  final resolvedFile = await bookmarks.resolveBookmark(permission!);
+  try {
+    await bookmarks.startAccessingSecurityScopedResource(resolvedFile);
+    print("Permission granted");
+
+    // List the contents of the directory and print each file name
+    final directory = Directory(resolvedFile.path);
+    final List<FileSystemEntity> entities = directory.listSync();
+    for (var entity in entities) {
+      print(entity.path);
+    }
+  } catch (e) {
+    print("Permission denied");
+  } finally {
+    await bookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+  }
+}
 
 
   Future<void> _loadOther() async{
-    String platform = await getConfig('platform');
+    String? platform = await getConfig('platform');
     // print("platform: $platform");
-    List<String> categories = await getCategories();
-    String engine = await getConfig('search_engine');
+    // List<String> categories = await getCategories();
+    String? engine = await getConfig('search_engine');
     // print("engine: $engine");
+    await downloadCastAvatar("6DdoTgW9jdJwDmVFZRP8D0AtVFs.jpg");
+    await downloadDB();
 
     //load the folders
     setState(() {
       _platform = platform;
 
-      if (categories.isNotEmpty) {
-        _categories.addAll(categories);
-        _selectedCategory = categories[0];
-      }
+      // if (categories.isNotEmpty) {
+      //   _categories.addAll(categories);
+      //   _selectedCategory = categories[0];
+      // }
       _searchEngine = engine;
     });
   }
@@ -190,6 +240,11 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
   bookmark = _allFilmsFolder[0]['bookMarks'];
   String lastFolder = _allFilmsFolder[0]['films_folder'].split(Platform.pathSeparator).last;
+  final folder = _allFilmsFolder[0]['films_folder'];
+
+  setState(() {
+    _filmsFolder = folder;
+  });
 
   if (bookmark == "bookmark_placeholder") {
     final folder = _allFilmsFolder[0]['films_folder'];
@@ -231,8 +286,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         //     '/Volumes/movie-disk-1/Home Cinema/subtitle/Iron.Man.2008.US.2160p.BluRay.x265.10bit.SDR.DTS-HD.MA.TrueHD.7.1.Atmos-SWTYBLZ.zh.ass',
         //     '/Volumes/movie-disk-1/Home Cinema/subtitle/a.mkv');
 
-        moveFile('/Volumes/movie-disk-1/Home Cinema/The.Wolverine.2013.1080p.BluRay.DDP7.1.x264-MOMOHD.mkv',
-            '/Volumes/movie-disk-1/Home Cinema/subtitle/abc.mkv');
+        // moveFile('/Volumes/movie-disk-1/Home Cinema/The.Wolverine.2013.1080p.BluRay.DDP7.1.x264-MOMOHD.mkv',
+        //     '/Volumes/movie-disk-1/Home Cinema/subtitle/abc.mkv');
 
         await Future.delayed(Duration(milliseconds: 100)); // Yield control back to the UI thread
         await _loadVideoFiles();
@@ -246,7 +301,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     } on PlatformException catch (e) {
       if (e.code == 'UnexpectedError' && e.message?.contains('NSCocoaErrorDomain Code=4') == true) {
         print("Error: The file doesn’t exist.");
-
+        print(e);
         setState(() {
           _isLoading = false;
           _videoFiles = [VideoFile(name: "F01", path: "No such file or directory", size: -9999, lastModified: DateTime.now())];
@@ -362,7 +417,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
   Future<void> _rescanFolder() async {
+    print("Rescanning folder...");
     if (_filmsFolder != null) {
+      print("Rescanning folder: $_filmsFolder");
       if(_selectedOption == 'All Folder'){
         if(_platform == 'macos') {
           await _loadAllVideoFilesMacOS();
@@ -376,13 +433,27 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         if(_platform == 'macos'){
           final secureBookmarks = SecureBookmarks();
           String? bookmark = _optionsMap[_selectedOption]?[1];
-          final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
-          await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
-          try {
-            await _loadVideoFiles();
-          } finally {
-            await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+          try{
+            final resolvedFile = await secureBookmarks.resolveBookmark(bookmark!);
+            await secureBookmarks.startAccessingSecurityScopedResource(resolvedFile);
+            try {
+              await _loadVideoFiles();
+            } finally {
+              await secureBookmarks.stopAccessingSecurityScopedResource(resolvedFile);
+            }
+          }on PlatformException catch (e) {
+            if (e.code == 'UnexpectedError' && e.message?.contains('NSCocoaErrorDomain Code=4') == true) {
+              print("Error: The file doesn’t exist111111111.");
+              // add a 1 second delay
+              await Future.delayed(Duration(milliseconds: 500));
+              setState(() {
+                _videoFiles = [VideoFile(name: "F01", path: "No such file or directory", size: -9999, lastModified: DateTime.now())];
+              });
+            } else {
+              print("Erroraaaaa: $e");
+            }
           }
+
         }
         setState(() {
           _isLoading = false;
@@ -711,18 +782,31 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
 
-  Future<Map<String, dynamic>> _loadMovieDetails(String movieID, String type) async {
 
-    List<List<String>> genres = await fetchMovieGenresAndOverview(movieID,type);
-    List<String> keywords = await fetchMovieKeywords(movieID,type);
-    List<Map<String, String>> cast = await fetchMovieCast(movieID,type);
 
-    return {
-      'genres': genres,
-      'keywords': keywords,
-      'cast': cast,
-    };
-  }
+    // call this api https://movie.bugsmachine.top/tmdb/search?movie_name=loki&movie_type=1
+    // to get the movie details
+
+    Future<Map<String, dynamic>> _loadMovieDetails(String movieID, String type) async {
+      final response = await http.get(
+        Uri.parse('https://movie.bugsmachine.top/tmdb/details?movie_id=$movieID&movie_type=$type'),
+      );
+
+      print('https://movie.bugsmachine.top/tmdb/search?movie_id=$movieID&movie_type=$type');
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        return {
+          'keywords': List<String>.from(data['keywords']),
+          'genres': List<String>.from(data['genres']),
+          'overview': data['overview'],
+          'cast': List<Map<String, String>>.from(data['cast'].map((item) => Map<String, String>.from(item))),
+        };
+      } else {
+        print(response.body);
+        throw Exception('Failed to load movie details');
+      }
+    }
+
 
 
 
@@ -732,6 +816,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       _tagsAdded = false; // Reset the flag here
       tagsWithColors.clear();
       _movieOverview = "";
+      genresWithColors.clear();
+      _cast.clear();
     });
     String imagePath = '';
     GlobalKey<State> modalKey = GlobalKey<State>();
@@ -788,7 +874,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         movieLabels["INT"] = movieInfo[key]!;
       } else if (key == "movieID") {
         movieID = movieInfo[key]!;
-      }else if(key == "type"){
+      } else if(key == "type") {
         type = movieInfo[key]!;
       }
     }
@@ -796,6 +882,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     String newFilePath = '${_filmsFolder!}/recorded_films/$filmName/${videoFile.name}';
 
     LoadingOverlay.hide(context);
+
+    if(movieID.isEmpty) {
+      setState(() {
+        _tagsAdded = true;
+      });
+    }
 
     CustomModal.show(
       context,
@@ -810,14 +902,17 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Top section with film details and poster
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Left column - Main content
                       Expanded(
                         flex: 3,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Film name and search section
                             Row(
                               children: [
                                 Expanded(
@@ -825,7 +920,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                     controller: filmNameController,
                                     decoration: const InputDecoration(
                                       labelText: 'Film Name (English Name is better for the Poster search)',
-                                      labelStyle: TextStyle(height: 0.8), // Adjust the height to move the label down
+                                      labelStyle: TextStyle(height: 0.8),
                                     ),
                                     onChanged: (value) {
                                       setState(() {
@@ -836,10 +931,6 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   ),
                                 ),
                                 SizedBox(width: 8),
-                                // Text(
-                                //   fileExtension,
-                                //   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                                // ),
                                 Tooltip(
                                   message: 'Search detail information for the movie: $filmName',
                                   child: IconButton(
@@ -853,206 +944,88 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                             ),
                             _buildNonEditableField('File Path', newFilePath, "This is the new planned file path. Original path ${videoFile.path}"),
                             _fileType(_updateFileType, _updateSubtitlePath),
-                            _categories.isNotEmpty
-                                ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text('Category:', style: TextStyle(fontSize: 13, color: Colors.black)),
-                                SizedBox(width: 8),
-                                Container(
-                                  height: 36,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.grey.shade400),
-                                    color: Colors.white,
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(maxWidth: 100), // Set the max width to 200
-                                      child: DropdownButton<String>(
-                                        isExpanded: true, // Allow DropdownButton to take full width of 200
-                                        value: _selectedCategory,
-                                        icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
-                                        dropdownColor: Colors.white,
-                                        style: TextStyle(color: Colors.black, fontSize: 14),
-                                        items: _categories.map<DropdownMenuItem<String>>((String value) {
-                                          return DropdownMenuItem<String>(
-                                            value: value,
-                                            child: Tooltip(
-                                              message: value, // Show full text on hover
-                                              waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
-                                              child: Text(
-                                                value,
-                                                overflow: TextOverflow.ellipsis, // Truncate long text
-                                                maxLines: 1, // Keep text to a single line
-                                              ),
-                                            ),
-                                          );
-                                        }).toList(),
-                                        onChanged: (String? newValue) {
-                                          setState(() {
-                                            _selectedCategory = newValue!;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                IconButton(
-                                  icon: Icon(Icons.add),
-                                  onPressed: () {
-                                    // set the categoryController text to empty
-                                    categoryController.text = '';
-                                    CustomModal.show(
-                                      context,
-                                      'Add New Category',
-                                      TextField(
-                                        controller: categoryController,
-                                        decoration: InputDecoration(
-                                          labelText: 'Category Name',
-                                        ),
-                                      ),
-                                      [
-                                        TextButton(
-                                          child: Text('Cancel'),
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                        ),
-                                        TextButton(
-                                          child: Text('Create'),
-                                          onPressed: () async {
-                                            String newCategory = categoryController.text;
-                                            if (newCategory.isNotEmpty) {
-                                              await insertCategory(newCategory);
-                                              setState(() {
-                                                _categories.add(newCategory);
-                                                _selectedCategory = newCategory;
-                                              });
-                                              Navigator.of(context).pop();
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                  tooltip: 'Add New Category',
-                                  iconSize: 24,
-                                ),
-                                SizedBox(width: 8),
-                                IconButton(
-                                  icon: Icon(Icons.manage_history),
-                                  onPressed: () {
-                                    CustomModal.show(
-                                      context,
-                                      'Manage Categories',
-                                      StatefulBuilder(
-                                        builder: (BuildContext context, StateSetter modalSetState) {
-                                          return Column(
-                                            children: [
-                                              ..._categories.map((category) {
-                                                return Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(category),
-                                                    ),
-                                                    IconButton(
-                                                      icon: Icon(Icons.delete),
-                                                      onPressed: () async {
-                                                        await deleteCategory(category);
-                                                        setState(() {
-                                                          _categories.remove(category);
-                                                          if (_selectedCategory == category && _categories.isNotEmpty) {
-                                                            _selectedCategory = _categories[0];
-                                                          } else if (_categories.isEmpty) {
-                                                            _selectedCategory = '';
-                                                          }
-                                                        });
-                                                        modalSetState(() {}); // Update the modal's state
-                                                      },
-                                                    ),
-                                                  ],
-                                                );
-                                              }).toList(),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                      [
-                                        TextButton(
-                                          child: Text('Close'),
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                  tooltip: 'Manage Categories',
-                                  iconSize: 24,
-                                )
-                              ],
-                            )
-                                : Row(
-                              children: [
-                                const Text('Category:', style: TextStyle(fontSize: 13, color: Colors.black)),
-                                SizedBox(width: 8),
-                                IconButton(
-                                  icon: Icon(Icons.add),
-                                  onPressed: () {
-                                    CustomModal.show(
-                                      context,
-                                      'Add New Category',
-                                      TextField(
-                                        controller: categoryController,
-                                        decoration: InputDecoration(
-                                          labelText: 'Category Name',
-                                        ),
-                                      ),
-                                      [
-                                        TextButton(
-                                          child: Text('Cancel'),
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                        ),
-                                        TextButton(
-                                          child: Text('Create'),
-                                          onPressed: () async {
-                                            String newCategory = categoryController.text;
-                                            if (newCategory.isNotEmpty) {
-                                              await insertCategory(newCategory);
-                                              setState(() {
-                                                _categories.add(newCategory);
-                                                _selectedCategory = newCategory;
-                                              });
-                                              Navigator.of(context).pop();
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                  tooltip: 'Add New Category',
-                                  iconSize: 24,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Create a category first.',
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                              ],
-                            ),
                             SizedBox(height: 10),
+
+                            // Genres Section
                             StatefulBuilder(
                               builder: (BuildContext context, StateSetter setState) {
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    Text('Genres:', style: TextStyle(fontSize: 13, color: Colors.black)),
+                                    SizedBox(height: 8),
                                     if (!_tagsAdded)
-                                    // Show loading animation when no tags
+                                      Container(
+                                        padding: EdgeInsets.symmetric(vertical: 10),
+                                        child: Center(
+                                          child: Column(
+                                            children: [
+                                              SizedBox(
+                                                width: 24,
+                                                height: 24,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                                ),
+                                              ),
+                                              SizedBox(height: 8),
+                                              Text(
+                                                'Loading Genres...',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Tags(
+                                        tagsWithColors: genresWithColors,
+                                        onRemove: (tag) {
+                                          setState(() {
+                                            genresWithColors.removeWhere((tagData) => tagData['tag'] == tag);
+                                          });
+                                        },
+                                      ),
+
+                                    if(_tagsAdded)
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Row(
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.add),
+                                              onPressed: () => _showAddGenreDialog(context, setState),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Add a new genre',
+                                              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                  ],
+                                );
+                              },
+                            ),
+
+                            // Categories Section
+                            // _buildCategoriesSection(),
+
+                            SizedBox(height: 10),
+
+                            // Tags Section
+                            StatefulBuilder(
+                              builder: (BuildContext context, StateSetter setState) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Tags:', style: TextStyle(fontSize: 13, color: Colors.black)),
+                                    SizedBox(height: 8),
+                                    if (!_tagsAdded)
                                       Container(
                                         padding: EdgeInsets.symmetric(vertical: 10),
                                         child: Center(
@@ -1088,106 +1061,178 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                         },
                                       ),
 
-                                    // Align the add icon to the left
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: IconButton(
-                                        icon: const Icon(Icons.add),
-                                        onPressed: () {
-                                          TextEditingController newTagController = TextEditingController();
-
-                                          CustomModal.show(
-                                            context,
-                                            'Add New Tag',
-                                            StatefulBuilder(
-                                              builder: (BuildContext context, StateSetter modalSetState) {
-                                                return TextField(
-                                                  controller: newTagController,
-                                                  decoration: InputDecoration(
-                                                    labelText: 'Tag Name',
-                                                  ),
-                                                );
-                                              },
+                                    if(_tagsAdded)
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Row(
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.add),
+                                              onPressed: () => _showAddTagDialog(context, setState),
                                             ),
-                                            [
-                                              TextButton(
-                                                child: Text('Cancel'),
-                                                onPressed: () {
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                              TextButton(
-                                                child: Text('Create'),
-                                                onPressed: () {
-                                                  String newTagName = newTagController.text.trim();
-                                                  if (newTagName.isNotEmpty) {
-                                                    setState(() {
-                                                      addTag(newTagName);
-                                                    });
-                                                  }
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                    ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Add a new tag',
+                                              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                                            ),
+                                          ],
+                                        ),
+                                      )
                                   ],
                                 );
                               },
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ...tagFields,
-                                IconButton(
-                                  icon: Icon(Icons.add),
-                                  onPressed: () {
-                                    int newIndex = tagFields.length;
-                                    setState(() {
-                                      tagFields.add(_buildTagField(newIndex, modalKey));
-                                    });
-                                    print('Total tag fields: ${tagFields.length}');
-                                  },
-                                ),
-                              ],
                             ),
                           ],
                         ),
                       ),
                       SizedBox(width: 13),
-                      _movieImageBox(),
+                      // Right column - Movie poster
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: 300,
+                          maxWidth: 200,
+                        ),
+                        child: _movieImageBox(),
+                      ),
                     ],
                   ),
-                  FutureBuilder<Map<String, dynamic>>(
+
+                  SizedBox(height: 16),
+
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Main Cast:',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 10),
+                      _cast.isEmpty
+                          ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                          : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: _cast.map((castMember) {
+                            final name = castMember['name'] ?? '';
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 16.0),
+                              child: SizedBox(
+                                width: 120,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Tooltip(
+                                      message: name,
+                                      child: FutureBuilder<String>(
+                                        future: downloadCastAvatar(castMember['profile_path'] ?? ''),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.connectionState == ConnectionState.waiting) {
+                                            return const CircleAvatar(
+                                              radius: 50,
+                                              child: CircularProgressIndicator(),
+                                            );
+                                          } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                                            return const CircleAvatar(
+                                              radius: 50,
+                                              child: Icon(Icons.person, size: 40),
+                                            );
+                                          } else {
+                                            return CircleAvatar(
+                                              radius: 50,
+                                              backgroundImage: FileImage(File(snapshot.data!)),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      height: 20,
+                                      child: Tooltip(
+                                        message: name,
+                                        child: Text(
+                                          name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    SizedBox(
+                                      height: 32,
+                                      child: Text(
+                                        castMember['character'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    SizedBox(
+                                      height: 16,
+                                      child: Text(
+                                        castMember['episodes'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Movie Details Section
+                  movieID.isEmpty
+                      ? Center(child: Text('No movie details available'))
+                      : FutureBuilder<Map<String, dynamic>>(
                     future: _loadMovieDetails(movieID, type),
                     builder: (BuildContext context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
+                        return SizedBox.shrink();
                       } else if (snapshot.hasError) {
-                        return Center(child: Text('Error loading movie details'));
+                        return Center(child: Text('Error loading movie details: ${snapshot.error}'));
                       } else if (snapshot.hasData) {
                         var movieDetails = snapshot.data!;
-                        var genres = movieDetails['genres'] as List<List<String>>;
+                        var genres = movieDetails['genres'] as List<String>;
                         var keywords = movieDetails['keywords'] as List<String>;
                         var cast = movieDetails['cast'] as List<Map<String, String>>;
+                        String overview = movieDetails['overview'];
 
-                        String overview = genres[1][0];
-
-                        // Schedule the addition of tags after the build phase
+                        print(cast);
                         WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _addTags(keywords, overview, modalSetState);  // Pass the modalSetState
+                          _addTags(keywords, overview, modalSetState, genres, cast);
                         });
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Genres: ${genres.join(', ')}'),
-                            Text('Keywords: ${keywords.join(', ')}'),
-                            Text('Cast: ${cast.map((c) => c['name']).join(', ')}'),
-                          ],
-                        );
+                        return SizedBox.shrink();
+                        // Column(
+                        //   crossAxisAlignment: CrossAxisAlignment.start,
+                        //   children: [
+                        //     Text('Genres: ${genres.join(', ')}'),
+                        //     Text('Keywords: ${keywords.join(', ')}'),
+                        //     Text('Cast: ${cast.map((c) => c['name']).join(', ')}'),
+                        //   ],
+                        // );
                       } else {
                         return Center(child: Text('No movie details available'));
                       }
@@ -1218,12 +1263,98 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     );
   }
 
-  void _addTags(List<String> keywords, String overview, StateSetter modalSetState) {
+// Helper method to show add genre dialog
+  void _showAddGenreDialog(BuildContext context, StateSetter setState) {
+    TextEditingController newGenreController = TextEditingController();
+
+    CustomModal.show(
+      context,
+      'Add New Genre',
+      StatefulBuilder(
+        builder: (BuildContext context, StateSetter modalSetState) {
+          return TextField(
+            controller: newGenreController,
+            decoration: InputDecoration(
+              labelText: 'Genre Name',
+            ),
+          );
+        },
+      ),
+      [
+        TextButton(
+          child: Text('Cancel'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+        TextButton(
+          child: Text('Create'),
+          onPressed: () {
+            String newGenreName = newGenreController.text.trim();
+            if (newGenreName.isNotEmpty) {
+              setState(() {
+                addGenres(newGenreName);
+              });
+            }
+            Navigator.of(context).pop();
+          },
+        ),
+      ],
+    );
+  }
+
+// Helper method to show add tag dialog
+  void _showAddTagDialog(BuildContext context, StateSetter setState) {
+    TextEditingController newTagController = TextEditingController();
+
+    CustomModal.show(
+      context,
+      'Add New Tag',
+      StatefulBuilder(
+        builder: (BuildContext context, StateSetter modalSetState) {
+          return TextField(
+            controller: newTagController,
+            decoration: InputDecoration(
+              labelText: 'Tag Name',
+            ),
+          );
+        },
+      ),
+      [
+        TextButton(
+          child: Text('Cancel'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+        TextButton(
+          child: Text('Create'),
+          onPressed: () {
+            String newTagName = newTagController.text.trim();
+            if (newTagName.isNotEmpty) {
+              setState(() {
+                addTag(newTagName);
+              });
+            }
+            Navigator.of(context).pop();
+          },
+        ),
+      ],
+    );
+  }
+
+
+  void _addTags(List<String> keywords, String overview, StateSetter modalSetState,
+      List<String> genres, List<Map<String,String>> cast) {
     if (!_tagsAdded) {
       modalSetState(() {
         for (var keyword in keywords) {
           addTag(keyword);
         }
+        for (var genre in genres) {
+          addGenres(genre);
+        }
+        addCast(cast);
         addOverview(overview);
         _tagsAdded = true;
       });
@@ -1415,7 +1546,11 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   }
 
   Widget _fileType(void Function(String) updateFileType, void Function(String?) updateSubtitlePath) {
-    List<bool> isSelected = [_selectedFileType == 'Movie', _selectedFileType == 'Video']; // Initial selection state
+    List<bool> isSelected = [
+      _selectedFileType == 'Movie',
+      _selectedFileType == 'TV Show',
+      _selectedFileType == 'Video'
+    ]; // Initial selection state
 
     return StatefulBuilder(
       builder: (BuildContext context, StateSetter setState) {
@@ -1437,6 +1572,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text('TV Show'),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Text('Video'),
                     ),
                   ],
@@ -1446,8 +1585,24 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                       for (int i = 0; i < isSelected.length; i++) {
                         isSelected[i] = i == index;
                       }
-                      updateFileType(isSelected[0] ? 'Movie' : 'Video'); // Update parent state
-                      print('Selected: ${isSelected[0] ? 'Movie' : 'Video'}');
+
+                      if (isSelected[0]) {
+                        setState(() {
+                          _selectedFileType = 'Movie';
+                        });
+                        updateFileType('Movie');
+                      } else if (isSelected[1]) {
+                        setState(() {
+                          _selectedFileType = 'TV Show';
+                        });
+                        updateFileType('TV Show');
+                      } else {
+                        setState(() {
+                          _selectedFileType = 'Video';
+                        });
+                        updateFileType('Video');
+                      }
+                      print('Selected: ${isSelected[0] ? 'Movie' : isSelected[1] ? 'TV Show' : 'Video'}');
                     });
                   },
                   color: Colors.black, // Color of the text when not selected
@@ -1457,129 +1612,140 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                   constraints: BoxConstraints(minHeight: 24.0, minWidth: 44.0), // Make the buttons smaller
                 ),
                 SizedBox(width: 8),
-                if (_selectedFileType == 'Movie') _movieLabels(),
+                // if (_selectedFileType == 'Movie') _movieLabels(),
               ],
             ),
             const SizedBox(height: 8),
             if (_selectedFileType == 'Movie')
-              Row(
-                children: [
-                  const Text(
-                    "Subtitle:",
-                    style: TextStyle(fontSize: 13, color: Colors.black),
+              Column(
+        children: [
+          Row(
+            children: [
+              _movieLabels()
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              const Text(
+                "Subtitle:",
+                style: TextStyle(fontSize: 13, color: Colors.black),
+              ),
+              const SizedBox(width: 8),
+              if (_selectedSubtitlePath == null || _selectedSubtitlePath!.isEmpty) ...[
+                ElevatedButton(
+                  onPressed: () async {
+                    FilePickerResult? result = await FilePicker.platform.pickFiles();
+                    if (result != null) {
+                      PlatformFile file = result.files.first;
+                      setState(() {
+                        _selectedSubtitlePath = file.path;
+                        _subtitles.add(file.path!);
+                        _subtitles = _subtitles.toSet().toList(); // Remove duplicates
+                      });
+                      updateSubtitlePath(file.path); // Update parent state
+                      print("Subtitle path: $_selectedSubtitlePath");
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 10),
                   ),
-                  const SizedBox(width: 8),
-                  if (_selectedSubtitlePath == null || _selectedSubtitlePath!.isEmpty) ...[
-                    ElevatedButton(
-                      onPressed: () async {
-                        FilePickerResult? result = await FilePicker.platform.pickFiles();
-                        if (result != null) {
-                          PlatformFile file = result.files.first;
-                          setState(() {
-                            _selectedSubtitlePath = file.path;
-                            _subtitles.add(file.path!);
-                            _subtitles = _subtitles.toSet().toList(); // Remove duplicates
-                          });
-                          updateSubtitlePath(file.path); // Update parent state
-                          print("Subtitle path: $_selectedSubtitlePath");
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 10),
-                      ),
-                      child: const Text("Upload Subtitle"),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Handle search subtitle
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 10),
-                      ),
-                      child: const Text("Search Subtitle"),
-                    ),
-                  ] else ...[
-                    Container(
-                      height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.grey.shade400),
-                        color: Colors.white,
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: 200), // Set the max width to 200
-                          child: DropdownButton<String>(
-                            isExpanded: true, // Allow DropdownButton to take full width of 200
-                            value: _selectedSubtitlePath,
-                            icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
-                            dropdownColor: Colors.white,
-                            style: TextStyle(color: Colors.black, fontSize: 14),
-                            items: _subtitles.map<DropdownMenuItem<String>>((String value) {
-                              String displayValue = value.split('/').last;
-                              return DropdownMenuItem<String>(
-                                value: value,
-                                child: Center( // Center the text
-                                  child: Tooltip(
-                                    message: value, // Full file path as tooltip
-                                    waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
-                                    child: Text(
-                                      displayValue,
-                                      overflow: TextOverflow.ellipsis, // Truncate long text
-                                      maxLines: 1, // Keep text to a single line
-                                    ),
-                                  ),
+                  child: const Text("Upload Subtitle"),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    // Handle search subtitle
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 10),
+                  ),
+                  child: const Text("Search Subtitle"),
+                ),
+              ] else ...[
+                Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey.shade400),
+                    color: Colors.white,
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 200), // Set the max width to 200
+                      child: DropdownButton<String>(
+                        isExpanded: true, // Allow DropdownButton to take full width of 200
+                        value: _selectedSubtitlePath,
+                        icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
+                        dropdownColor: Colors.white,
+                        style: TextStyle(color: Colors.black, fontSize: 14),
+                        items: _subtitles.map<DropdownMenuItem<String>>((String value) {
+                          String displayValue = value.split('/').last;
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Center( // Center the text
+                              child: Tooltip(
+                                message: value, // Full file path as tooltip
+                                waitDuration: Duration(milliseconds: 200), // Delay of 0.3s
+                                child: Text(
+                                  displayValue,
+                                  overflow: TextOverflow.ellipsis, // Truncate long text
+                                  maxLines: 1, // Keep text to a single line
                                 ),
-                              );
-                            }).toList(),
-                            onChanged: (String? newValue) {
-                              setState(() {
-                                _selectedSubtitlePath = newValue;
-                              });
-                            },
-                          ),
-                        ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedSubtitlePath = newValue;
+                          });
+                        },
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () async {
-                        // Handle manage subtitle
-                        FilePickerResult? result = await FilePicker.platform.pickFiles();
-                        if (result != null) {
-                          PlatformFile file = result.files.first;
-                          setState(() {
-                            _selectedSubtitlePath = file.path;
-                            _subtitles.add(file.path!);
-                            _subtitles = _subtitles.toSet().toList(); // Remove duplicates
-                          });
-                          updateSubtitlePath(file.path); // Update parent state
-                          print("new Subtitle path: $_selectedSubtitlePath");
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 3),
-                    IconButton(
-                      icon: const Icon(Icons.manage_accounts),
-                      onPressed: () {
-                        // Handle manage subtitle
-                      },
-                    ),
-                    const SizedBox(width: 3),
-                    IconButton(
-                      icon: const Icon(Icons.search_rounded),
-                      onPressed: () {
-                        // Handle manage subtitle
-                      },
-                    ),
-                  ],
-                ],
-              )
+                  ),
+                ),
+                const SizedBox(width: 3),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () async {
+                    // Handle manage subtitle
+                    FilePickerResult? result = await FilePicker.platform.pickFiles();
+                    if (result != null) {
+                      PlatformFile file = result.files.first;
+                      setState(() {
+                        _selectedSubtitlePath = file.path;
+                        _subtitles.add(file.path!);
+                        _subtitles = _subtitles.toSet().toList(); // Remove duplicates
+                      });
+                      updateSubtitlePath(file.path); // Update parent state
+                      print("new Subtitle path: $_selectedSubtitlePath");
+                    }
+                  },
+                ),
+                const SizedBox(width: 3),
+                IconButton(
+                  icon: const Icon(Icons.manage_accounts),
+                  onPressed: () {
+                    // Handle manage subtitle
+                  },
+                ),
+                const SizedBox(width: 3),
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  onPressed: () {
+                    // Handle manage subtitle
+                  },
+                ),
+              ],
+            ],
+          )
+        ],
+         )
+
             else
               SizedBox.shrink(),
             SizedBox(height: 8),
@@ -1593,7 +1759,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                       style: TextStyle(fontSize: 13, color: Colors.black),
                     ),
                     SizedBox(width: 8),
-                    _movieOverview.isEmpty
+                    !_tagsAdded
                         ? Row(
                       children: [
                         SizedBox(
@@ -1608,7 +1774,58 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                         ),
                       ],
                     )
-                        : SizedBox.shrink(),
+                    : Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.mode_edit_outlined),
+                          onPressed: () {
+                            // Handle edit overview
+
+                            TextEditingController overviewController = TextEditingController(text: _movieOverview);
+
+                            CustomModal.show(
+                              context,
+                              'Edit Overview',
+                              Container(
+                                width: 500, // Set the desired width
+                                child: TextField(
+                                  controller: overviewController,
+                                  maxLines: 5,
+                                  decoration: InputDecoration(
+                                    labelText: 'Overview',
+                                  ),
+                                ),
+                              ),
+                              [
+                                TextButton(
+                                  child: Text('Cancel'),
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                                TextButton(
+                                  child: Text('Save'),
+                                  onPressed: () {
+                                    // get the new overview
+                                    String newOverview = overviewController.text;
+                                    print('New overview: $newOverview');
+
+                                    setState(() {
+                                      _movieOverview = newOverview;
+                                    });
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        Text(
+                          'Edit Overview',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        ),
+                      ],
+                    )
                   ],
                 ),
                 if (_movieOverview.isNotEmpty)
@@ -1627,6 +1844,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       },
     );
   }
+
+
 
   // Method to collect all tags
   List<List<String>> _collectInfo() {

@@ -1,15 +1,77 @@
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../service/main_service.dart';
 
 late Database db;
 
-// Initialize the database
+Future<void> iniDB() async {
+  // Get the user's home directory
+  Directory homeDir = Directory(Platform.environment['HOME']!);
+
+  // Specify the path to the shared folder
+  String sharedFolderPath = join(homeDir.path, 'shared_folder');
+
+  String newDBFolderPath = join(sharedFolderPath, 'newDB');
+
+  // Specify the replacement database file path
+  String replacementDbPath = join(sharedFolderPath, 'replacement_movies_database.db');
+
+  // Check if the replacement database file exists
+  if (await File(replacementDbPath).exists()) {
+    print("Replacement database file found. Using it to initialize the database.");
+    await initDatabaseFromDBFile(replacementDbPath);
+  } else {
+    print("No replacement database file found. Initializing default database.");
+    await initDatabase();
+  }
+}
+
+Future<void> initDatabaseFromDBFile(String dbFilePath) async {
+  print("Initializing database from specified file: $dbFilePath");
+
+  // Open the specified database file without altering schema
+  db = await openDatabase(
+    dbFilePath,
+    readOnly: false, // Set to true if you want to avoid accidental data modifications
+    onOpen: (db) {
+      print("Database successfully opened from $dbFilePath");
+    },
+  );
+}
+
+
 Future<void> initDatabase() async {
   print("initDatabase");
+
+  // Get the user's home directory
+  Directory homeDir = Directory(Platform.environment['HOME']!);
+
+  // Specify the path to the shared folder
+  String sharedFolderPath = join(homeDir.path, 'shared_folder');
+
+  // Create the shared folder if it doesn't exist
+  await Directory(sharedFolderPath).create(recursive: true);
+
+  // Specify the path to the database file
+  String dbPath = join(sharedFolderPath, 'movies_database.db');
+  String replacementDbPath = join(sharedFolderPath, 'replacement_movies_database.db');
+
+  print("dbPath: $dbPath");
+
+  // Check if a replacement database file exists
+  if (await File(replacementDbPath).exists()) {
+    print("Replacement database found. Replacing current database...");
+    await File(replacementDbPath).copy(dbPath);
+    await File(replacementDbPath).delete(); // Optionally delete the replacement file after copying
+  }
+
+  print("dbPath: $dbPath");
   db = await openDatabase(
-    join(await getDatabasesPath(), 'movies_database.db'),
-    version: 34, // Increment the version number
+    dbPath,
+    version: 17, // Increment the version number
     onCreate: (db, version) {
       print("onCreate");
       return db.transaction((txn) async {
@@ -22,8 +84,61 @@ Future<void> initDatabase() async {
             category TEXT NOT NULL
           )
         ''');
+      });
+    },
+    onUpgrade: (db, oldVersion, newVersion) async {
+      print("onUpgrade");
+      await db.transaction((txn) async {
+        // Drop existing tables
+        await txn.execute('DROP TABLE IF EXISTS Files');
+        await txn.execute('DROP TABLE IF EXISTS Keywords');
+        await txn.execute('DROP TABLE IF EXISTS FileKeywords');
+        await txn.execute('DROP TABLE IF EXISTS Groups');
+        await txn.execute('DROP TABLE IF EXISTS Genres');
+        await txn.execute('DROP TABLE IF EXISTS GenresAndFiles');
+        await txn.execute('DROP TABLE IF EXISTS UserDefault');
+        await txn.execute('DROP TABLE IF EXISTS Config');
 
-        // Create Keywords table
+        // Recreate tables with new schema
+        await txn.execute('''
+  CREATE TABLE Files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
+    name TEXT NOT NULL,
+    type INTEGER NOT NULL,
+    group_id INTEGER NOT NULL,
+    FOREIGN KEY (group_id) REFERENCES Groups(id)
+  )
+''');
+
+        await txn.execute('''
+  CREATE TABLE Genres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    group_id INTEGER NOT NULL,
+    FOREIGN KEY (group_id) REFERENCES Groups(id)
+  )
+''');
+
+        await txn.execute('''
+  CREATE TABLE GenresAndFiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL,
+    genre_id INTEGER NOT NULL,
+    FOREIGN KEY (file_id) REFERENCES Files(id),
+    FOREIGN KEY (genre_id) REFERENCES Genres(id)
+  )
+''');
+
+        await txn.execute('''
+          CREATE TABLE Groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            password TEXT,
+            icon TEXT NOT NULL
+          )
+        ''');
+
         await txn.execute('''
           CREATE TABLE Keywords (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,98 +146,82 @@ Future<void> initDatabase() async {
           )
         ''');
 
-        // Create MovieKeywords (junction table) to map movies and keywords
         await txn.execute('''
-          CREATE TABLE MovieKeywords (
-            movie_id INTEGER,
-            keyword_id INTEGER,
-            FOREIGN KEY(movie_id) REFERENCES Movies(id),
-            FOREIGN KEY(keyword_id) REFERENCES Keywords(id),
-            PRIMARY KEY (movie_id, keyword_id)
+          CREATE TABLE UserDefault (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bookMarks TEXT NOT NULL,
+            films_folder TEXT NOT NULL,
+            last_db_modified TEXT NOT NULL
           )
         ''');
 
-        // Indexes for efficient searching
-        await txn.execute('CREATE INDEX idx_keyword_id ON MovieKeywords(keyword_id)');
-        await txn.execute('CREATE INDEX idx_movie_id ON MovieKeywords(movie_id)');
-      });
-    },
-    onUpgrade: (db, oldVersion, newVersion) async {
-      print("onUpgrade");
-      await db.transaction((txn) async {
-        // Drop existing tables
-        await txn.execute('DROP TABLE IF EXISTS Movies');
-        await txn.execute('DROP TABLE IF EXISTS Keywords');
-        await txn.execute('DROP TABLE IF EXISTS MovieKeywords');
-        await txn.execute('DROP TABLE IF EXISTS Categories');
-        await txn.execute('DROP TABLE IF EXISTS UserDefault');
-        await txn.execute('DROP TABLE IF EXISTS Config');
-
-        // Recreate tables with new schema
         await txn.execute('''
-      CREATE TABLE Movies (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        path TEXT NOT NULL,
-        name TEXT NOT NULL,
-        category INTEGER,
-        FOREIGN KEY (category) REFERENCES Categories(id)
-      )
-    ''');
+          CREATE TABLE Config (
+            id TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+          )
+        ''');
 
         await txn.execute('''
-      CREATE TABLE Categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL
-      )
-    ''');
+          CREATE TABLE FileKeywords (
+            file_id INTEGER,
+            keyword_id INTEGER,
+            FOREIGN KEY(file_id) REFERENCES Files(id),
+            FOREIGN KEY(keyword_id) REFERENCES Keywords(id),
+            PRIMARY KEY (file_id, keyword_id)
+          )
+        ''');
 
-        await txn.execute('''
-      CREATE TABLE Keywords (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        keyword TEXT NOT NULL
-      )
-    ''');
+        // add groups
+        await txn.execute('''INSERT INTO Groups(name, password, icon) VALUES ('Movies', '',"Icons.video_library_outlined");''');
+        await txn.execute('''INSERT INTO Groups(name, password, icon) VALUES ('TV Shows', '',"Icons.video_library_outlined");''');
+        await txn.execute('''INSERT INTO Groups(name, password, icon) VALUES ('Photos', '',"Icons.video_library_outlined");''');
 
-        await txn.execute('''
-  CREATE TABLE UserDefault (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bookMarks TEXT NOT NULL,
-    films_folder TEXT NOT NULL,
-    last_db_modified TEXT NOT NULL
-  )
-''');
+        // add some example genres
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Action', 1);''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Comedy', 1);''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Drama', 1);''');
 
-        await txn.execute('''
-      CREATE TABLE Config (
-        id TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      )
-    ''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('aaaa', 2);''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('bbbb', 2);''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('cccc', 2);''');
 
-        await txn.execute('''
-      CREATE TABLE MovieKeywords (
-        movie_id INTEGER,
-        keyword_id INTEGER,
-        FOREIGN KEY(movie_id) REFERENCES Movies(id),
-        FOREIGN KEY(keyword_id) REFERENCES Keywords(id),
-        PRIMARY KEY (movie_id, keyword_id)
-      )
-    ''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('1234', 3);''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('2345y', 3);''');
+        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('5678', 3);''');
 
-        // add a default row value in user default
-        await txn.execute('''INSERT INTO UserDefault(bookMarks,films_folder, last_db_modified) VALUES ('null1','null1','null1');''');
-
-        // add a default row value in config with ID "search_engine"
+        // Add default rows
+        await txn.execute('''INSERT INTO UserDefault(bookMarks, films_folder, last_db_modified) VALUES ('null1', 'null1', 'null1');''');
+        // default config
+        await txn.execute('''INSERT INTO Config(id, value) VALUES ('library_permission', 'no');''');
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('search_engine', 'https://www.google.com');''');
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('platform', 'null2');''');
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('last_write_config_time', 'en');''');
+
         // Indexes for efficient searching
-        await txn.execute('CREATE INDEX idx_keyword_id ON MovieKeywords(keyword_id)');
-        await txn.execute('CREATE INDEX idx_movie_id ON MovieKeywords(movie_id)');
+        await txn.execute('CREATE INDEX idx_keyword_id ON FileKeywords(keyword_id)');
+        await txn.execute('CREATE INDEX idx_movie_id ON FileKeywords(File_id)');
       });
     },
   );
 }
+
+// get the genre of a group
+Future<List<Map<String, dynamic>>> getGenres(int groupId) async {
+  print("getGenres");
+  List<Map<String, dynamic>> genres = await db.query('Genres', where: 'group_id = ?', whereArgs: [groupId]);
+
+  return genres;
+}
+
+
+Future<List<Map<String, dynamic>>> getGroups() async {
+  print("getGroups");
+  List<Map<String, dynamic>> groups = await db.query('Groups');
+
+  return groups;
+}
+
 
 // update the config
 Future<void> updateConfig(String key, String value) async {
@@ -137,9 +236,12 @@ Future<void> insertConfig(String key, String value) async {
   await db.insert('Config', {'id': key, 'value': value});
 }
 
-Future<String> getConfig(String key) async {
+Future<String?> getConfig(String key) async {
   print("getConfig of key:  " + key);
   List<Map<String, dynamic>> config = await db.query('Config', where: 'id = ?', whereArgs: [key]);
+  if (config.isEmpty) {
+    return null;
+  }
   return config[0]['value'];
 }
 

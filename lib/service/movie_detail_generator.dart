@@ -99,35 +99,86 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
   };
 }
 
-Future<List<dynamic>> fetchMoviePoster(String movieTitle, int type) async {
-  final apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
-  var url = Uri.parse('https://api.themoviedb.org/3/search/movie?api_key=$apiKey&query=$movieTitle');
-  if (type == 1) {
-    url = Uri.parse('https://api.themoviedb.org/3/search/tv?api_key=$apiKey&query=$movieTitle');
-  }
-  List<dynamic> movieDetails = [];
-  final response = await http.get(url);
+Future<String> downloadCastAvatar(String profilePath) async {
+  const serverUrl = 'https://movie.bugsmachine.top/tmdb/image?image_link=';
 
+  Directory homeDir = Directory(Platform.environment['HOME']!);
+  Directory documentsDir = Directory('${homeDir.path}/Documents');
+  Directory avatarFolder = Directory('${documentsDir.path}/cast_avatar');
+  // Create the folder if it doesn't exist
+  if (!await avatarFolder.exists()) {
+    await avatarFolder.create(recursive: true);
+  }
+  // check if the file already exists
+  File file = File('${avatarFolder.path}/$profilePath');
+  if (file.existsSync()) {
+    return file.path;
+  }
+  print("downloading avatar");
+  final response = await http.get(Uri.parse('$serverUrl$profilePath'));
   if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    if (data['results'] != null && data['results'].length > 0) {
-      // Get the poster path
-      final posterPath = data['results'][0]['poster_path'];
-      final id = data['results'][0]['id'];
-      print('id $id');
-      // get the path and pass to another fuc called abc()
-      movieDetails.add('https://image.tmdb.org/t/p/w500$posterPath');
-      movieDetails.add(id);
-      return movieDetails;
-    } else {
-      // No poster found, return error image
-      return movieDetails;
-    }
+    File file = File('${avatarFolder.path}/$profilePath');
+    await file.writeAsBytes(response.bodyBytes);
+    print('Avatar downloaded and saved to ${file.path}');
+    return file.path;
   } else {
-    // Error during the API call, return error image
-    return movieDetails;
+    print('Failed to download avatar: ${response.statusCode}');
+    print("Failed to download avatar: ${response.body}");
+    return '';
+  }
+
+}
+
+Future<List<dynamic>> fetchMoviePoster(String movieTitle, int type) async {
+  final response = await http.get(
+    Uri.parse('https://movie.bugsmachine.top/tmdb/search?movie_name=$movieTitle&movie_type=$type'),
+  );
+
+  print('https://movie.bugsmachine.top/tmdb/search?movie_name=$movieTitle&movie_type=$type');
+  if (response.statusCode == 200) {
+    print(response.body);
+    final Map<String, dynamic> data = json.decode(response.body);
+    String posterPath = data['poster_link'];
+    String id = data['movie_id'].toString();
+    List<String> details = [posterPath, id];
+    print(details);
+    return details;
+  } else {
+    print(response.body);
+    return [];
   }
 }
+
+
+// Future<List<dynamic>> fetchMoviePoster(String movieTitle, int type) async {
+//   final apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+//   var url = Uri.parse('https://api.themoviedb.org/3/search/movie?api_key=$apiKey&query=$movieTitle');
+//   if (type == 1) {
+//     url = Uri.parse('https://api.themoviedb.org/3/search/tv?api_key=$apiKey&query=$movieTitle');
+//   }
+//   List<dynamic> movieDetails = [];
+//   final response = await http.get(url);
+//
+//   if (response.statusCode == 200) {
+//     final data = json.decode(response.body);
+//     if (data['results'] != null && data['results'].length > 0) {
+//       // Get the poster path
+//       final posterPath = data['results'][0]['poster_path'];
+//       final id = data['results'][0]['id'];
+//       print('id $id');
+//       // get the path and pass to another fuc called abc()
+//       movieDetails.add('https://image.tmdb.org/t/p/w500$posterPath');
+//       movieDetails.add(id);
+//       return movieDetails;
+//     } else {
+//       // No poster found, return error image
+//       return movieDetails;
+//     }
+//   } else {
+//     // Error during the API call, return error image
+//     return movieDetails;
+//   }
+// }
 
 Future<List<String>> fetchMovieKeywords(String movieID, String type) async {
   const apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
