@@ -11,6 +11,7 @@ import 'package:home_cinema_app/service/main_service.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import '../component/inner_top_bar.dart';
 import '../component/tags.dart';
+import '../generated/l10n.dart';
 import '../main.dart';
 import '../repository/db.dart';
 import '../models/video_file.dart';
@@ -23,11 +24,17 @@ import '../service/local_file_operation.dart';
 
 
 class UnrecordedFilmsView extends StatefulWidget {
+  final S lang;
+
+  const UnrecordedFilmsView({Key? key, required this.lang}) : super(key: key);
+
+
   @override
   _UnrecordedFilmsViewState createState() => _UnrecordedFilmsViewState();
 }
 
 class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
+  Map<String, dynamic>? _movieDetails;
   bool _tagsAdded = false;
   Map<String,String> movieLabels = {};
   String? _filmsFolder;
@@ -36,11 +43,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   List<VideoFile> _videoFiles = [VideoFile(name: "empty", path: "empty_placeholder", size: 0, lastModified: DateTime.now())];
   bool _isLoading = false;
   List<Widget> tagFields = [];
-  String? _searchEngine;
-  String? _modalErrorMessage;
+  String filePath = "";
   String? _platform;
   String? _selectedSubtitlePath = "";
   List<String> _subtitles = [];
+  String _selectedGroup = 'Group 1';
+  List<String> _groups = [];
 
   List<Map<String, String>> _cast = [];
 
@@ -62,6 +70,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   String _selectedFileType = 'Movie'; // Add this state variable
 
   String _movieOverview = '';
+
+  String _vote = '';
 
   final List<Color> lightColors = [
     Colors.red.shade200,
@@ -134,6 +144,12 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   void addCast(List<Map<String,String>> casts){
     setState(() {
       _cast = casts;
+    });
+  }
+
+  void addVote(String vote) {
+    setState(() {
+      _vote = vote;
     });
   }
 
@@ -216,7 +232,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       //   _categories.addAll(categories);
       //   _selectedCategory = categories[0];
       // }
-      _searchEngine = engine;
+      // _searchEngine = engine;
     });
   }
 
@@ -512,7 +528,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         children: [
           Divider(height: 1, color: Colors.grey[300]),
           InnerTopBar(
-            label: 'Current Folder:',
+            label: widget.lang.current_folder,
             options: _options,
             selectedOption: _selectedOption,
             onChanged: _onDropdownChanged,
@@ -533,7 +549,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
             additionalWidgets: [
               Row(
                 children: [
-                  const Text("File detected: "),
+                  Text(widget.lang.file_detected),
                   _isLoading
                       ? const SizedBox(
                     width: 16,
@@ -671,11 +687,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   ),
                                   SizedBox(height: 4),
                                   Text(
-                                    'Size: ${videoFile.size >= 1000 * 1000 * 1000 ? (videoFile.size / 1000 / 1000 / 1000).toStringAsFixed(2) + " GB" : (videoFile.size / 1024 / 1024).toStringAsFixed(2) + " MB"}',
+                                    videoFile.size >= 1000 * 1000 * 1000
+                                        ? '${widget.lang.size}${(videoFile.size / 1000 / 1000 / 1000).toStringAsFixed(2)} GB'
+                                        : '${widget.lang.size}${(videoFile.size / 1024 / 1024).toStringAsFixed(2)} MB',
                                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                                   ),
                                   Text(
-                                    'Modified: ${videoFile.lastModified}',
+                                    '${widget.lang.last_modified_time}: ${videoFile.lastModified}',
                                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                                   ),
                                 ],
@@ -787,27 +805,177 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     // call this api https://movie.bugsmachine.top/tmdb/search?movie_name=loki&movie_type=1
     // to get the movie details
 
-    Future<Map<String, dynamic>> _loadMovieDetails(String movieID, String type) async {
-      final response = await http.get(
-        Uri.parse('https://movie.bugsmachine.top/tmdb/details?movie_id=$movieID&movie_type=$type'),
-      );
-
-      print('https://movie.bugsmachine.top/tmdb/search?movie_id=$movieID&movie_type=$type');
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return {
-          'keywords': List<String>.from(data['keywords']),
-          'genres': List<String>.from(data['genres']),
-          'overview': data['overview'],
-          'cast': List<Map<String, String>>.from(data['cast'].map((item) => Map<String, String>.from(item))),
-        };
-      } else {
-        print(response.body);
-        throw Exception('Failed to load movie details');
-      }
+  Future<Map<String, dynamic>> _loadMovieDetails(String movieID, String type) async {
+    if (_movieDetails != null) {
+      return _movieDetails!;
     }
 
+    Locale currentLocale = Localizations.localeOf(context);
+    String languageCode = currentLocale.languageCode;
+    String countryCode = currentLocale.countryCode ?? '';
 
+    String languageType;
+    if (languageCode == 'en') {
+      languageType = 'en';
+    } else if (languageCode == 'zh' && countryCode == 'TW') {
+      languageType = 'zh-TW';
+    } else if (languageCode == 'zh') {
+      languageType = 'zh-CN';
+    } else {
+      languageType = 'Unknown';
+    }
+
+    final response = await http.get(
+      Uri.parse('https://movie.bugsmachine.top/tmdb/details?movie_id=$movieID&movie_type=$type&language=$languageType'),
+    );
+
+    print("aasasasasasasasasasasasasasasasasa");
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      _movieDetails = {
+        'keywords': List<String>.from(data['keywords']),
+        'genres': List<String>.from(data['genres']),
+        'overview': data['overview'],
+        'vote': data['vote'],
+        'cast': List<Map<String, String>>.from(data['cast'].map((item) => Map<String, String>.from(item))),
+      };
+      return _movieDetails!;
+    } else {
+      throw Exception('Failed to load movie details');
+    }
+  }
+
+
+  Widget _buildGroups() {
+  return StatefulBuilder(
+    builder: (context, setState) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Text(widget.lang.group, style: TextStyle(fontSize: 13, color: Colors.black)),
+              SizedBox(width: 4),
+              FutureBuilder<List<String>>(
+                future: _getGroupsFromDB(),
+                builder: (context, snapshot) {
+                  return AnimatedSwitcher(
+                    duration: Duration(milliseconds: 300),
+                    child: _buildGroupContent(snapshot, setState),
+                  );
+                },
+              ),
+              Tooltip(
+                message: widget.lang.add_new_group,
+                child: IconButton(
+                  icon: Icon(Icons.add),
+                  onPressed: () {
+                    _showAddGroupDialog(context);
+                  },
+                ),
+              ),
+              SizedBox(width: 4),
+              Tooltip(
+                message: widget.lang.manage_group,
+                child: IconButton(
+                  icon: Icon(Icons.settings),
+                  onPressed: () {
+                    _showAddGroupDialog(context);
+                  },
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6),
+        ],
+      );
+    },
+  );
+}
+
+Widget _buildGroupContent(AsyncSnapshot<List<String>> snapshot, StateSetter setState) {
+  if (snapshot.connectionState == ConnectionState.waiting) {
+    return CircularProgressIndicator();
+  } else if (snapshot.hasError) {
+    return Text('Error: ${snapshot.error}');
+  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+    return Text('No groups available');
+  } else {
+    // If no group is selected yet, set the first group as default
+    if (_selectedGroup == null && snapshot.data!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _selectedGroup = snapshot.data!.first;
+        });
+      });
+    }
+
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey.shade400),
+        color: Colors.white,
+      ),
+      child: DropdownButtonHideUnderline(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 120),
+          child: DropdownButton<String>(
+            isExpanded: true,
+            value: _selectedGroup,
+            icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.black),
+            dropdownColor: Colors.white,
+            style: TextStyle(color: Colors.black, fontSize: 14),
+            items: snapshot.data!.map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Tooltip(
+                  message: value,
+                  waitDuration: Duration(milliseconds: 200),
+                  child: Text(
+                    value,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedGroup = newValue!;
+              });
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+  Future<List<String>> _getGroupsFromDB() async {
+
+    if(_groups.isNotEmpty) {
+      return _groups;
+    }
+
+    print("Getting groups from the database...");
+    List<Map<String, dynamic>> rawGroups = await getGroups();
+    List<String> groups = [];
+    for (var group in rawGroups) {
+      groups.add(group['name']);
+    }
+
+    setState(() {
+      _groups = groups;
+      _selectedGroup = (groups.isNotEmpty ? groups[0] : null)!;
+    });
+    return _groups;
+  }
+
+  void _showAddGroupDialog(BuildContext context) {
+    // Replace with your method to show a dialog to add a new group
+  }
 
 
   Future<void> _showEditFilmDetailsModal(BuildContext context, VideoFile videoFile) async {
@@ -818,10 +986,14 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       _movieOverview = "";
       genresWithColors.clear();
       _cast.clear();
+      _movieDetails = null;
+      _vote = "";
+      _groups.clear();
+      filePath = "";
     });
     String imagePath = '';
     GlobalKey<State> modalKey = GlobalKey<State>();
-    tagFields.add(_buildTagField(0, modalKey));
+    // tagFields.add(_buildTagField(0, modalKey));
     String filmName = '';
     String fileExtension = '.${videoFile.name.split('.').last}';
 
@@ -830,7 +1002,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     tagFields.clear();
     _tagControllers.clear();
-    tagFields.add(_buildTagField(0, modalKey));
+    // tagFields.add(_buildTagField(0, modalKey));
     _tagControllers.add(TextEditingController());
 
     String movieID = "";
@@ -838,7 +1010,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     LoadingOverlay.show(
       context,
-      'Predicting Movie Detail...',
+      widget.lang.searching_movie_detail,
       width: 250,
       height: 150,
     );
@@ -856,9 +1028,11 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         filmNameController.text = filmName;
       } else if (key == "posterUrl") {
         imagePath = movieInfo[key]!;
-        print("imagePath: $imagePath");
+        // get the last part of the image path
+        List<String> parts = imagePath.split('/');
+        String imageName = parts[parts.length - 1];
         setState(() {
-          coverImg = imagePath;
+          coverImg = "/$imageName";
         });
       } else if (key == "year") {
         movieLabels["year"] = movieInfo[key]!;
@@ -881,6 +1055,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     String newFilePath = '${_filmsFolder!}/recorded_films/$filmName/${videoFile.name}';
 
+    setState(() {
+      filePath = newFilePath;
+    });
+
     LoadingOverlay.hide(context);
 
     if(movieID.isEmpty) {
@@ -891,7 +1069,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     CustomModal.show(
       context,
-      'Edit Film Details',
+      widget.lang.edit_file_detail,
       StatefulBuilder(
         key: modalKey,
         builder: (BuildContext context, StateSetter modalSetState) {
@@ -918,14 +1096,15 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 Expanded(
                                   child: TextField(
                                     controller: filmNameController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Film Name (English Name is better for the Poster search)',
-                                      labelStyle: TextStyle(height: 0.8),
+                                    decoration: InputDecoration(
+                                      labelText: widget.lang.file_name,
+                                      labelStyle: const TextStyle(height: 0.8),
                                     ),
                                     onChanged: (value) {
                                       setState(() {
                                         filmName = value;
                                         newFilePath = '${_filmsFolder!}/recorded_films/$filmName/$filmName$fileExtension';
+                                        filePath = '${_filmsFolder!}/recorded_films/$filmName/$filmName$fileExtension';
                                       });
                                     },
                                   ),
@@ -942,9 +1121,11 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 )
                               ],
                             ),
-                            _buildNonEditableField('File Path', newFilePath, "This is the new planned file path. Original path ${videoFile.path}"),
+                            _buildNonEditableField(widget.lang.file_path, newFilePath, "This is the new planned file path. Original path ${videoFile.path}"),
+                            _buildGroups(),
                             _fileType(_updateFileType, _updateSubtitlePath),
                             SizedBox(height: 10),
+                            // User Score section
 
                             // Genres Section
                             StatefulBuilder(
@@ -952,7 +1133,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Genres:', style: TextStyle(fontSize: 13, color: Colors.black)),
+                                    Text(widget.lang.genres, style: TextStyle(fontSize: 13, color: Colors.black)),
                                     SizedBox(height: 8),
                                     if (!_tagsAdded)
                                       Container(
@@ -970,7 +1151,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                               ),
                                               SizedBox(height: 8),
                                               Text(
-                                                'Loading Genres...',
+                                                widget.lang.loading_genres,
                                                 style: TextStyle(
                                                   color: Colors.grey[600],
                                                   fontSize: 14,
@@ -1001,7 +1182,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                             ),
                                             SizedBox(width: 8),
                                             Text(
-                                              'Add a new genre',
+                                              widget.lang.add_genre,
                                               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                                             ),
                                           ],
@@ -1023,7 +1204,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Tags:', style: TextStyle(fontSize: 13, color: Colors.black)),
+                                    Text(widget.lang.tags, style: TextStyle(fontSize: 13, color: Colors.black)),
                                     SizedBox(height: 8),
                                     if (!_tagsAdded)
                                       Container(
@@ -1041,7 +1222,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                               ),
                                               SizedBox(height: 8),
                                               Text(
-                                                'Loading tags...',
+                                                widget.lang.loading_tags,
                                                 style: TextStyle(
                                                   color: Colors.grey[600],
                                                   fontSize: 14,
@@ -1072,7 +1253,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                             ),
                                             SizedBox(width: 8),
                                             Text(
-                                              'Add a new tag',
+                                              widget.lang.add_tag,
                                               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                                             ),
                                           ],
@@ -1089,11 +1270,16 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                       // Right column - Movie poster
                       ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxHeight: 300,
+                          maxHeight: 500,
                           maxWidth: 200,
                         ),
-                        child: _movieImageBox(),
-                      ),
+                        child: Column(
+                          children: [
+                            _movieImageBox(),
+                            _userScore(),
+                          ],
+                        ),
+                      )
                     ],
                   ),
 
@@ -1102,14 +1288,21 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Main Cast:',
+                       Text(
+                        widget.lang.main_cast,
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 10),
                       _cast.isEmpty
-                          ? const Center(
-                        child: CircularProgressIndicator(),
+                          ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 10),
+                            Text(widget.lang.loading_main_cast),
+                          ],
+                        ),
                       )
                           : SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
@@ -1126,7 +1319,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Tooltip(
-                                      message: name,
+                                      message: widget.lang.click_to_view + name + widget.lang.s_profile,
                                       child: FutureBuilder<String>(
                                         future: downloadCastAvatar(castMember['profile_path'] ?? ''),
                                         builder: (context, snapshot) {
@@ -1141,9 +1334,15 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                                               child: Icon(Icons.person, size: 40),
                                             );
                                           } else {
-                                            return CircleAvatar(
-                                              radius: 50,
-                                              backgroundImage: FileImage(File(snapshot.data!)),
+                                            return InkWell(
+                                              onTap: () {
+                                                final url = 'https://www.themoviedb.org/person/${castMember['id']}';
+                                                launch(url);
+                                              },
+                                              child: CircleAvatar(
+                                                radius: 50,
+                                                backgroundImage: FileImage(File(snapshot.data!)),
+                                              ),
                                             );
                                           }
                                         },
@@ -1218,10 +1417,10 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                         var keywords = movieDetails['keywords'] as List<String>;
                         var cast = movieDetails['cast'] as List<Map<String, String>>;
                         String overview = movieDetails['overview'];
+                        String vote = movieDetails['vote'];
 
-                        print(cast);
                         WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _addTags(keywords, overview, modalSetState, genres, cast);
+                          _addTags(keywords, overview, modalSetState, genres, cast, vote);
                         });
 
                         return SizedBox.shrink();
@@ -1246,13 +1445,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       ),
       [
         TextButton(
-          child: Text('Cancel'),
+          child: Text(widget.lang.cancel),
           onPressed: () {
             Navigator.of(context).pop();
           },
         ),
         TextButton(
-          child: Text('Submit'),
+          child: Text(widget.lang.submit),
           onPressed: () {
             print(_collectInfo());
           },
@@ -1269,7 +1468,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     CustomModal.show(
       context,
-      'Add New Genre',
+      widget.lang.add_genre,
       StatefulBuilder(
         builder: (BuildContext context, StateSetter modalSetState) {
           return TextField(
@@ -1309,7 +1508,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
     CustomModal.show(
       context,
-      'Add New Tag',
+      widget.lang.add_tag,
       StatefulBuilder(
         builder: (BuildContext context, StateSetter modalSetState) {
           return TextField(
@@ -1322,13 +1521,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
       ),
       [
         TextButton(
-          child: Text('Cancel'),
+          child: Text(widget.lang.cancel),
           onPressed: () {
             Navigator.of(context).pop();
           },
         ),
         TextButton(
-          child: Text('Create'),
+          child: Text(widget.lang.submit),
           onPressed: () {
             String newTagName = newTagController.text.trim();
             if (newTagName.isNotEmpty) {
@@ -1345,7 +1544,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
   void _addTags(List<String> keywords, String overview, StateSetter modalSetState,
-      List<String> genres, List<Map<String,String>> cast) {
+      List<String> genres, List<Map<String,String>> cast, String vote) {
     if (!_tagsAdded) {
       modalSetState(() {
         for (var keyword in keywords) {
@@ -1356,194 +1555,207 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
         }
         addCast(cast);
         addOverview(overview);
+        addVote(vote);
         _tagsAdded = true;
       });
     }
   }
 
+  Widget _userScore() {
+    return StatefulBuilder(
+      builder: (BuildContext context, StateSetter setState) {
+        double percentage = 0.0;
+        if (_vote.isNotEmpty) {
+          percentage = (double.tryParse(_vote) ?? 0) * 10;
+        }
+
+        return Column(
+          children: [
+            SizedBox(height: 10),
+            if (!_tagsAdded || _vote.isEmpty)
+              const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity, // Take full width
+                child: Center( // Center the content horizontally
+                  child: Wrap( // Use Wrap instead of Row for better flexibility
+                    alignment: WrapAlignment.center, // Center the wrapped items
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 20, // Horizontal spacing between items
+                    children: [
+                      Text(
+                        widget.lang.user_score,
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            height: 40,
+                            width: 40,
+                            child: CircularProgressIndicator(
+                              value: percentage / 100,
+                              backgroundColor: Colors.grey[200],
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                              strokeWidth: 6,
+                            ),
+                          ),
+                          Text(
+                            '${percentage.round()}%',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 
 
   Widget _movieImageBox() {
-    final imageDownloader = ImageDownloader();
-    String imageName = coverImg.split('/').last;
+  String imageName = coverImg.split('/').last;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Centered header row
-        Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Movie Poster',
-                style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
+  return Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      // Centered header row
+      Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.lang.movie_poster,
+              style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
+            ),
+            SizedBox(width: 4),
+            Tooltip(
+              message: 'Poster image from tmdb.org, NO commercial use!',
+              child: Icon(
+                Icons.help_outline,
+                size: 16,
+                color: Colors.grey,
               ),
-              SizedBox(width: 4),
-              Tooltip(
-                message: 'Poster image from tmdb.org, NO commercial use!',
-                child: Icon(
-                  Icons.help_outline,
-                  size: 16,
-                  color: Colors.grey,
+            ),
+          ],
+        ),
+      ),
+      SizedBox(height: 8),
+      // Centered poster container
+      Center(
+        child: coverImg == ""
+            ? Container(
+          width: 150,
+          height: 230,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Image.asset('assets/no_img.png'),
+          ),
+        )
+            : FutureBuilder<String>(
+          future: downloadPoster(imageName),
+          builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                width: 150,
+                height: 230,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-            ],
-          ),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            } else if (snapshot.hasError) {
+              return Container(
+                width: 150,
+                height: 230,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text('Error: ${snapshot.error}'),
+                ),
+              );
+            } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+              return Container(
+                width: 150,
+                height: 230,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                  image: DecorationImage(
+                    image: FileImage(File(snapshot.data!)),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              );
+            } else {
+              return Container(
+                width: 150,
+                height: 230,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text('No image available'),
+                ),
+              );
+            }
+          },
         ),
-        SizedBox(height: 8),
-        // Centered poster container
-        Center(
-          child: coverImg == ""
-              ? Container(
-            width: 150,
-            height: 230,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(8),
+      ),
+      SizedBox(height: 8),
+      // Centered buttons
+      Center(
+        child: coverImg == ""
+            ? Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () {
+                // Handle upload action
+              },
+              child: Text('Upload'),
             ),
-            child: Center(
-              child: Image.asset('assets/no_img.png'),
+            SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: () {
+                // Handle search action
+              },
+              child: Text('Search'),
             ),
-          )
-              : FutureBuilder<Image>(
-            future: imageDownloader.downloadImage(imageName),
-            builder: (BuildContext context, AsyncSnapshot<Image> snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Container(
-                  width: 150,
-                  height: 230,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              } else if (snapshot.hasError) {
-                return Container(
-                  width: 150,
-                  height: 230,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  ),
-                );
-              } else {
-                return Container(
-                  width: 150,
-                  height: 230,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                    image: snapshot.hasData
-                        ? DecorationImage(
-                      image: snapshot.data!.image,
-                      fit: BoxFit.cover,
-                    )
-                        : null,
-                  ),
-                );
-              }
-            },
-          ),
+          ],
+        )
+            : ElevatedButton(
+          onPressed: () {
+            // Handle delete action
+          },
+          child: Text(widget.lang.delete_poster),
         ),
-        SizedBox(height: 8),
-        // Centered buttons
-        Center(
-          child: coverImg == ""
-              ? Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  // Handle upload action
-                },
-                child: Text('Upload'),
-              ),
-              SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () {
-                  // Handle search action
-                },
-                child: Text('Search'),
-              ),
-            ],
-          )
-              : ElevatedButton(
-            onPressed: () {
-              // Handle delete action
-            },
-            child: Text('Delete Poster'),
-          ),
-        ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
-  Widget _buildTagField(int index, GlobalKey modalKey) {
-    // Ensure the controller list is large enough
-    if (_tagControllers.length <= index) {
-      _tagControllers.add(TextEditingController());
-    }
-
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _tagControllers[index],
-            decoration: InputDecoration(
-              labelText: 'Tag ${index + 1}',
-            ),
-          ),
-        ),
-        if (index > 0) // Only show the delete icon if the index is greater than 0
-          IconButton(
-            icon: Icon(Icons.delete),
-            onPressed: () {
-              if (tagFields.length == 1) {
-                CustomModal.show(
-                  context,
-                  'Error',
-                  Text('At least one tag field is required.'),
-                  [
-                    TextButton(
-                      child: Text('OK'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ],
-                );
-                return;
-              }
-              // Update both modal and parent state to reflect the change
-              modalKey.currentState?.setState(() {
-                print(index);
-                tagFields.removeAt(index);
-                // add an empty view at the place delete tagFileds
-                tagFields.insert(index, SizedBox.shrink()); // Add an empty view at the same index
-                // get the controller at the index and set the value to empty
-                _tagControllers[index].text = '';
-                // _tagControllers.removeAt(index);
-              });
-              // setState(() {
-              //   print(_tagControllers.length);
-              //   tagFields.removeAt(index);
-              //   _tagControllers.removeAt(index);
-              // });
-              print('removed tag field at index $index');
-              print(tagFields);
-            },
-          ),
-      ],
-    );
-  }
 
   Widget _fileType(void Function(String) updateFileType, void Function(String?) updateSubtitlePath) {
     List<bool> isSelected = [
@@ -1560,25 +1772,11 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
-                  'Select File Type:',
+                  widget.lang.select_file_type,
                   style: TextStyle(fontSize: 13, color: Colors.black),
                 ),
                 SizedBox(width: 8),
                 ToggleButtons(
-                  children: <Widget>[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text('Movie'),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text('TV Show'),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text('Video'),
-                    ),
-                  ],
                   isSelected: isSelected,
                   onPressed: (int index) {
                     setState(() {
@@ -1609,7 +1807,21 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                   selectedColor: Colors.white, // Color of the text when selected
                   fillColor: Colors.blue, // Background color when selected
                   borderRadius: BorderRadius.circular(8.0),
-                  constraints: BoxConstraints(minHeight: 24.0, minWidth: 44.0), // Make the buttons smaller
+                  constraints: BoxConstraints(minHeight: 24.0, minWidth: 44.0),
+                  children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(widget.lang.movie),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(widget.lang.tv_show),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(widget.lang.video),
+                    ),
+                  ], // Make the buttons smaller
                 ),
                 SizedBox(width: 8),
                 // if (_selectedFileType == 'Movie') _movieLabels(),
@@ -1627,8 +1839,8 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
           SizedBox(height: 8),
           Row(
             children: [
-              const Text(
-                "Subtitle:",
+              Text(
+                widget.lang.subtitle,
                 style: TextStyle(fontSize: 13, color: Colors.black),
               ),
               const SizedBox(width: 8),
@@ -1651,7 +1863,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     textStyle: const TextStyle(fontSize: 10),
                   ),
-                  child: const Text("Upload Subtitle"),
+                  child: Text(widget.lang.upload_subtitle),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
@@ -1662,7 +1874,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     textStyle: const TextStyle(fontSize: 10),
                   ),
-                  child: const Text("Search Subtitle"),
+                  child: Text(widget.lang.search_subtitle),
                 ),
               ] else ...[
                 Container(
@@ -1755,7 +1967,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 Row(
                   children: [
                     Text(
-                      'Overview:',
+                      widget.lang.overview,
                       style: TextStyle(fontSize: 13, color: Colors.black),
                     ),
                     SizedBox(width: 8),
@@ -1769,7 +1981,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                         ),
                         SizedBox(width: 8),
                         Text(
-                          'Loading overview, please wait...',
+                          widget.lang.loading_overview,
                           style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
                       ],
@@ -1785,7 +1997,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
                             CustomModal.show(
                               context,
-                              'Edit Overview',
+                              widget.lang.edit_overview,
                               Container(
                                 width: 500, // Set the desired width
                                 child: TextField(
@@ -1821,7 +2033,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                           },
                         ),
                         Text(
-                          'Edit Overview',
+                          widget.lang.edit_overview,
                           style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
                       ],
@@ -1848,20 +2060,22 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
 
 
   // Method to collect all tags
-  List<List<String>> _collectInfo() {
-    List<List<String>> info = [];
-    List<String> tags = _tagControllers.map((controller) => controller.text).toList();
-    // get the movie name
-    String movieName = filmNameController.text;
-    // get the category
-    String category = _selectedCategory;
-    String imgPath = coverImg;
-    String fileType = _selectedFileType;
-    String subtitlePath = _selectedSubtitlePath ?? '';
-    List<String> movieInfo = [movieName, category, imgPath];
-    info.add(movieInfo);
-    info.add(tags);
-    info.add([fileType, subtitlePath]);
+  Map<String,dynamic> _collectInfo() {
+    Map<String,dynamic> info = {};
+
+
+    info['movieName'] = filmNameController.text;
+    info['imgPath'] = coverImg;
+    info['fileType'] = _selectedFileType;
+    info["group"] = _selectedGroup;
+    info['filePaths'] = filePath;
+    info['subtitlePath'] = _selectedSubtitlePath ?? '';
+    info['overview'] = _movieOverview;
+    info['vote'] = _vote;
+    info['genres'] = genresWithColors.map((genre) => genre['tag']).toList();
+    info['tags'] = tagsWithColors.map((tag) => tag['tag']).toList();
+    info['cast'] = _cast;
+
     return info;
   }
 

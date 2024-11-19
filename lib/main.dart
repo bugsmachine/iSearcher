@@ -4,6 +4,7 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:ffmpeg_kit_flutter/ffmpeg_kit_config.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import 'package:home_cinema_app/view/all_movies_view.dart';
 import 'package:home_cinema_app/view/unrecorded_films_view.dart';
@@ -14,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
 import 'component/pop_up_menu.dart';
+import 'generated/l10n.dart';
 import 'repository/db.dart';
 import 'service/main_service.dart';
 import 'package:home_cinema_app/app_config/colors.dart';
@@ -76,7 +78,8 @@ void main(List<String> args) async {
   }
 
   await FFmpegKitConfig.init();
-  runApp(const MyApp());
+  await insertAllGenres();
+  runApp(const MyApp(locale: Locale("en")));
 
   // await executePythonScript();
   // await checkPythonInstallation();
@@ -386,13 +389,24 @@ class SettingsApp extends StatelessWidget {
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Locale locale;
+  const MyApp({super.key, required this.locale});
+
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Movie Searcher',
+      title: 'iSearcher',
+      localizationsDelegates: const [
+        AppLocalizationDelegate(),
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+
+      supportedLocales: const AppLocalizationDelegate().supportedLocales,
+      locale: locale,
       theme: ThemeData(
         useMaterial3: true,
       ),
@@ -400,6 +414,9 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -444,8 +461,19 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
     print('Window closed');
   }
 
+  late S lang;
+
+  _updateLang() async {
+    AppLocalizationDelegate delegate = const AppLocalizationDelegate();
+    //获取当前系统语言
+    Locale myLocale = Localizations.localeOf(context);
+    //根据当前语言获取对应的语言数据
+    lang = await delegate.load(myLocale);
+  }
+
   @override
   Widget build(BuildContext context) {
+    _updateLang();
     return Scaffold(
       body: Stack(
         children: [
@@ -607,11 +635,11 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       padding: const EdgeInsets.only(top: 4.0),
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 30.0),
+          Padding(
+            padding: const EdgeInsets.only(left: 30.0),
             child: Text(
-              'iSearcher',
-              style: TextStyle(
+              lang.app_title,
+              style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
@@ -719,7 +747,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   Widget _buildMainContent() {
     if (_selectedIndex == 0) {
-      return UnrecordedFilmsView();
+      return UnrecordedFilmsView(lang: lang);
     } else if (_selectedIndex == _groups.length + 1) {
       return const Center(child: Text('Settings')); // Placeholder for settings
     } else if (_selectedIndex > 0 && _selectedIndex <= _groups.length) {

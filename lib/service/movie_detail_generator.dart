@@ -114,12 +114,38 @@ Future<String> downloadCastAvatar(String profilePath) async {
   if (file.existsSync()) {
     return file.path;
   }
-  print("downloading avatar");
   final response = await http.get(Uri.parse('$serverUrl$profilePath'));
   if (response.statusCode == 200) {
     File file = File('${avatarFolder.path}/$profilePath');
     await file.writeAsBytes(response.bodyBytes);
-    print('Avatar downloaded and saved to ${file.path}');
+    return file.path;
+  } else {
+    print('Failed to download avatar: ${response.statusCode}');
+    print("Failed to download avatar: ${response.body}");
+    return '';
+  }
+
+}
+
+Future<String> downloadPoster(String posterPath) async {
+  const serverUrl = 'https://movie.bugsmachine.top/tmdb/image?image_link=';
+
+  Directory homeDir = Directory(Platform.environment['HOME']!);
+  Directory documentsDir = Directory('${homeDir.path}/Documents');
+  Directory avatarFolder = Directory('${documentsDir.path}/Posters');
+  // Create the folder if it doesn't exist
+  if (!await avatarFolder.exists()) {
+    await avatarFolder.create(recursive: true);
+  }
+  // check if the file already exists
+  File file = File('${avatarFolder.path}/$posterPath');
+  if (file.existsSync()) {
+    return file.path;
+  }
+  final response = await http.get(Uri.parse('$serverUrl$posterPath'));
+  if (response.statusCode == 200) {
+    File file = File('${avatarFolder.path}/$posterPath');
+    await file.writeAsBytes(response.bodyBytes);
     return file.path;
   } else {
     print('Failed to download avatar: ${response.statusCode}');

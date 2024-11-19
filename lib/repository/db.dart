@@ -71,7 +71,7 @@ Future<void> initDatabase() async {
   print("dbPath: $dbPath");
   db = await openDatabase(
     dbPath,
-    version: 17, // Increment the version number
+    version: 20, // Increment the version number
     onCreate: (db, version) {
       print("onCreate");
       return db.transaction((txn) async {
@@ -108,6 +108,15 @@ Future<void> initDatabase() async {
     type INTEGER NOT NULL,
     group_id INTEGER NOT NULL,
     FOREIGN KEY (group_id) REFERENCES Groups(id)
+  )
+''');
+
+        await txn.execute('''
+  CREATE TABLE GenresIntl (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    en TEXT NOT NULL,
+    zh TEXT NOT NULL,
+    zh_TW TEXT NOT NULL
   )
 ''');
 
@@ -194,6 +203,7 @@ Future<void> initDatabase() async {
         await txn.execute('''INSERT INTO UserDefault(bookMarks, films_folder, last_db_modified) VALUES ('null1', 'null1', 'null1');''');
         // default config
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('library_permission', 'no');''');
+
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('search_engine', 'https://www.google.com');''');
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('platform', 'null2');''');
         await txn.execute('''INSERT INTO Config(id, value) VALUES ('last_write_config_time', 'en');''');
@@ -205,6 +215,60 @@ Future<void> initDatabase() async {
     },
   );
 }
+
+
+
+Future<void> insertAllGenres() async {
+  try {
+    // Check if the table is empty
+    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM GenresIntl'));
+    if (count == 0) {
+      // List of genres to insert
+      print("insertAllGenres111112121212121212121212");
+      final genres = [
+        {'en': 'Action', 'zh': '动作', 'zh_TW': '動作'},
+        {'en': 'Adventure', 'zh': '冒险', 'zh_TW': '冒險'},
+        {'en': 'Animation', 'zh': '动画', 'zh_TW': '動畫'},
+        {'en': 'Comedy', 'zh': '喜剧', 'zh_TW': '喜劇'},
+        {'en': 'Crime', 'zh': '犯罪', 'zh_TW': '犯罪'},
+        {'en': 'Documentary', 'zh': '纪录', 'zh_TW': '紀錄'},
+        {'en': 'Drama', 'zh': '剧情', 'zh_TW': '劇情'},
+        {'en': 'Family', 'zh': '家庭', 'zh_TW': '家庭'},
+        {'en': 'Fantasy', 'zh': '奇幻', 'zh_TW': '奇幻'},
+        {'en': 'History', 'zh': '历史', 'zh_TW': '歷史'},
+        {'en': 'Horror', 'zh': '恐怖', 'zh_TW': '恐怖'},
+        {'en': 'Music', 'zh': '音乐', 'zh_TW': '音樂'},
+        {'en': 'Mystery', 'zh': '悬疑', 'zh_TW': '懸疑'},
+        {'en': 'Romance', 'zh': '爱情', 'zh_TW': '愛情'},
+        {'en': 'Science Fiction', 'zh': '科幻', 'zh_TW': '科幻'},
+        {'en': 'TV Movie', 'zh': '电视电影', 'zh_TW': '電視電影'},
+        {'en': 'Thriller', 'zh': '惊悚', 'zh_TW': '驚悚'},
+        {'en': 'War', 'zh': '战争', 'zh_TW': '戰爭'},
+        {'en': 'Western', 'zh': '西部', 'zh_TW': '西部'},
+      ];
+
+      // Start a batch for inserting multiple records
+      final batch = db.batch();
+      for (var genre in genres) {
+        batch.insert(
+          'GenresIntl',
+          genre,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      // Execute the batch
+      await batch.commit(noResult: true);
+
+      print('All genres inserted successfully.');
+    } else {
+      print('GenresIntl table is not empty. Skipping insertion.');
+    }
+  } catch (e) {
+    print('Error inserting genres: $e');
+  }
+}
+
 
 // get the genre of a group
 Future<List<Map<String, dynamic>>> getGenres(int groupId) async {
