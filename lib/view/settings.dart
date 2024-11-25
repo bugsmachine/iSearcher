@@ -18,7 +18,6 @@ class _SettingsWindowState extends State<SettingsWindow> {
   String _selectedSearchEngine = 'Google'; // Move this here
   TextEditingController _customUrlController = TextEditingController(); // Move this here
 
-  ImageDownloader imageService = ImageDownloader();
   List<String>? _imageStorageInfo;
 
   @override

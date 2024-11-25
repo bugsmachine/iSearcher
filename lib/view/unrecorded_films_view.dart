@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -34,6 +36,7 @@ class UnrecordedFilmsView extends StatefulWidget {
 }
 
 class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
+  List<String> searchResults = [];
   Map<String, dynamic>? _movieDetails;
   bool _tagsAdded = false;
   Map<String,String> movieLabels = {};
@@ -834,12 +837,13 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = json.decode(response.body);
       _movieDetails = {
-        'keywords': List<String>.from(data['keywords']),
-        'genres': List<String>.from(data['genres']),
-        'overview': data['overview'],
-        'vote': data['vote'],
-        'cast': List<Map<String, String>>.from(data['cast'].map((item) => Map<String, String>.from(item))),
+        'keywords': List<String>.from(data['keywords'] ?? []),
+        'genres': List<String>.from(data['genres'] ?? []),
+        'overview': data['overview'] ?? '',
+        'vote': data['vote'] ?? '',
+        'cast': List<Map<String, String>>.from((data['cast'] ?? []).map((item) => Map<String, String>.from(item))),
       };
+      print("Movie details: $_movieDetails");
       return _movieDetails!;
     } else {
       throw Exception('Failed to load movie details');
@@ -977,6 +981,172 @@ Widget _buildGroupContent(AsyncSnapshot<List<String>> snapshot, StateSetter setS
     // Replace with your method to show a dialog to add a new group
   }
 
+  void _showAllSearchResultDialog(BuildContext context) {
+  TextEditingController searchController = TextEditingController();
+  List<Map<String, dynamic>> searchResults = [];
+
+  CustomModal.show(
+    context,
+    "Search Result",
+    StatefulBuilder(
+      builder: (context, setState) {
+        return Column(
+          children: [
+            // Search bar
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Search',
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.search),
+                  onPressed: () async {
+                    final results = await _performSearch(searchController.text);
+                    setState(() {
+                      searchResults = results;
+                    });
+                  },
+                ),
+              ],
+            ),
+            // Display search results
+            Expanded(
+              child: ListView.separated(
+                itemCount: searchResults.length,
+                itemBuilder: (context, index) {
+                  final result = searchResults[index];
+                  return FutureBuilder<String>(
+                    future: downloadPoster(result['poster_path']),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return CircularProgressIndicator();
+                      } else if (snapshot.hasError) {
+                        return ListTile(
+                          title: Text(result['original_title'] ?? ''),
+                          subtitle: Text('Error loading poster'),
+                        );
+                      } else {
+                        return ListTile(
+                          leading: Expanded(
+                            child: Image.file(
+                              File(snapshot.data!),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          title: Text(
+                            result['original_title'] ?? '',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Overview: ${result['overview']}',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              InkWell(
+                                child: Text(
+                                  'TMDB Link: https://www.themoviedb.org/movie/${result['id']}',
+                                  style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                                ),
+                                onTap: () async {
+                                  final url = 'https://www.themoviedb.org/movie/${result['id']}';
+                                  if (await canLaunch(url)) {
+                                    await launch(url);
+                                  } else {
+                                    throw 'Could not launch $url';
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    },
+                  );
+                },
+                separatorBuilder: (context, index) => Divider(),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+    [
+      TextButton(
+        child: Text("Cancel"),
+        onPressed: () {
+          Navigator.of(context).pop();
+        },
+      ),
+    ],
+    width: 400,
+    height: 300,
+  );
+}
+
+Future<List<LinkedHashMap<String, dynamic>>> _performSearch(String query) async {
+  const apiKey = '15d2ea6d0dc1d476efbca3eba2b9bbfb';
+  final url = Uri.parse('https://api.themoviedb.org/3/search/movie?api_key=$apiKey&query=$query');
+  final response = await http.get(url);
+
+  print("url: $url");
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    final results = data['results'] as List<dynamic>;
+    return results.map((result) {
+      return LinkedHashMap<String, dynamic>.from({
+        'id': result['id'].toString(),
+        'original_title': result['original_title'] ?? result['name'] ?? '',
+        'poster_path': result['poster_path'] ?? '',
+        'overview': result['overview'] ?? '',
+        'date': result['first_air_date'] ?? '',
+      });
+    }).toList();
+  } else {
+    throw Exception('Failed to load search results');
+  }
+}
+
+Future<String> downloadPoster(String posterPath) async {
+  const serverUrl = 'http://8.153.39.151:8080/api/tmdb/image?image_link=';
+
+  Directory homeDir = Directory(Platform.environment['HOME']!);
+  Directory documentsDir = Directory('${homeDir.path}/Documents');
+  Directory avatarFolder = Directory('${documentsDir.path}/Posters');
+  // Create the folder if it doesn't exist
+  if (!await avatarFolder.exists()) {
+    await avatarFolder.create(recursive: true);
+  }
+  // check if the file already exists
+  File file = File('${avatarFolder.path}/$posterPath');
+  if (file.existsSync()) {
+    return file.path;
+  }
+  final response = await http.get(Uri.parse('$serverUrl$posterPath'));
+  if (response.statusCode == 200) {
+    File file = File('${avatarFolder.path}/$posterPath');
+    await file.writeAsBytes(response.bodyBytes, flush: true);
+
+    // Verify file after writing
+    if (await file.length() > 0) {
+      return file.path;
+    } else {
+      throw StateError('File is empty');
+    }
+  } else {
+    print('Failed to download poster: ${response.statusCode}');
+    print("Failed to download poster: ${response.body}");
+    return '';
+  }
+}
+
 
   Future<void> _showEditFilmDetailsModal(BuildContext context, VideoFile videoFile) async {
     setState(() {
@@ -1110,6 +1280,16 @@ Widget _buildGroupContent(AsyncSnapshot<List<String>> snapshot, StateSetter setS
                                   ),
                                 ),
                                 SizedBox(width: 8),
+                                Tooltip(
+                                  message: 'Not this one?? Click to see all results',
+                                  child: IconButton(
+                                    icon: Icon(Icons.error_outline_rounded, color: Colors.red),
+                                    onPressed: () {
+                                      print("search for another movie");
+                                      _showAllSearchResultDialog(context);
+                                    },
+                                  ),
+                                ),
                                 Tooltip(
                                   message: 'Search detail information for the movie: $filmName',
                                   child: IconButton(
@@ -1624,6 +1804,33 @@ Widget _buildGroupContent(AsyncSnapshot<List<String>> snapshot, StateSetter setS
   }
 
 
+
+
+  // Future<String> _downloadPoster(String posterPath) async {
+  //   print("Downloading poster: $posterPath");
+  //   if(!_isGetPoster){
+  //     print("first time get poster");
+  //     setState(() {
+  //       _isGetPoster = true;
+  //     });
+  //     String link =  await downloadPoster(posterPath);
+  //
+  //     setState(() {
+  //       _getedPoster = link;
+  //     });
+  //     return link;
+  //   }else{
+  //     // wait till the _getedPoster is not null and return the _getedPoste
+  //     print("second time get poster");
+  //     await Future.delayed(Duration(seconds: 1));
+  //     print("waiting for poster");
+  //     print("geted poster: $_getedPoster");
+  //     return _getedPoster;
+  //
+  //   }
+  // }
+
+
   Widget _movieImageBox() {
   String imageName = coverImg.split('/').last;
 
@@ -1702,7 +1909,7 @@ Widget _buildGroupContent(AsyncSnapshot<List<String>> snapshot, StateSetter setS
                   border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(8),
                   image: DecorationImage(
-                    image: FileImage(File(snapshot.data!)),
+                    image: FileImage(File(snapshot.data!), scale: DateTime.now().millisecondsSinceEpoch.toDouble()),
                     fit: BoxFit.cover,
                   ),
                 ),

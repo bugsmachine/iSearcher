@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:home_cinema_app/service/movie_detail_generator.dart';
 import 'package:home_cinema_app/view/all_movies_view.dart';
+import 'package:home_cinema_app/view/file_display_wall.dart';
 import 'package:home_cinema_app/view/unrecorded_films_view.dart';
 import 'package:home_cinema_app/web_server/server_main.dart';
 import 'package:macos_secure_bookmarks/macos_secure_bookmarks.dart';
@@ -433,6 +434,8 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   Map<String, bool> _isHovered = {}; // Track hover state for each subitem
   String? _selectedItem;
   Map<int,List<Map<String, dynamic>>> _genres = {};
+  var _selectedGroup = "";
+  var _selectedSubItem ="";
 
   @override
   void initState() {
@@ -473,8 +476,10 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
+
     _updateLang();
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           Row(
@@ -707,6 +712,9 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
         onTap: () {
           setState(() {
             _selectedItem = key;
+            _selectedIndex = group['id'];
+            _selectedGroup = group['name']; // Store the selected group
+            _selectedSubItem = subItem; // Store the selected sub-item
           });
           print("Clicked on $subItem in ${group['name']}");
         },
@@ -750,9 +758,12 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
       return UnrecordedFilmsView(lang: lang);
     } else if (_selectedIndex == _groups.length + 1) {
       return const Center(child: Text('Settings')); // Placeholder for settings
-    } else if (_selectedIndex > 0 && _selectedIndex <= _groups.length) {
-      final group = _groups[_selectedIndex - 1];
-      return Center(child: Text('Group: ${group['name']}')); // Placeholder for group content
+    } else if (_selectedGroup != null && _selectedSubItem != null) {
+      return FileDisplayWallView(
+        group: _selectedGroup,
+        subItem: _selectedSubItem,
+        lang: lang,
+      );
     } else {
       return const Center(child: Text('Unknown Page'));
     }
@@ -763,28 +774,3 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
 }
 
-class ImageDownloader {
-  static const platform = MethodChannel('image_download_channel');
-
-  Future<Image> downloadImage(String imageName) async {
-    try {
-      final String base64Image = await platform.invokeMethod('getImage', {'imageName': imageName});
-      final bytes = base64.decode(base64Image);
-      return Image.memory(Uint8List.fromList(bytes));
-    } catch (e) {
-      print("Error downloading image: $e");
-      return Image.asset('assets/err_img2.png'); // Fallback image in case of error
-    }
-  }
-
-  Future<List<String>?> getImageStorageInfo() async {
-    try {
-      final List<String>? info = await platform.invokeMethod("info");
-      print('Image storage info: $info');
-      return info;
-    } on PlatformException catch (e) {
-      print("Error getting image storage info: '${e.message}'.");
-      return null;
-    }
-  }
-}

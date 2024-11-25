@@ -100,7 +100,7 @@ Future<Map<String, String?>> predictMovieDetail(String movieName) async {
 }
 
 Future<String> downloadCastAvatar(String profilePath) async {
-  const serverUrl = 'https://movie.bugsmachine.top/tmdb/image?image_link=';
+  const serverUrl = 'http://8.153.39.151:8080/api/tmdb/image?image_link=';
 
   Directory homeDir = Directory(Platform.environment['HOME']!);
   Directory documentsDir = Directory('${homeDir.path}/Documents');
@@ -127,8 +127,34 @@ Future<String> downloadCastAvatar(String profilePath) async {
 
 }
 
+// Future<String> downloadPosterWithRetry(String imageName, {int retries = 3}) async {
+//   try {
+//     String filePath = await downloadPoster(imageName);
+//     File file = File(filePath);
+//
+//     // Check if the file is empty
+//     if (file.existsSync() && file.lengthSync() > 0) {
+//       return filePath;
+//     } else {
+//       throw StateError('File is empty');
+//     }
+//   } catch (e) {
+//     if (retries > 0) {
+//       await Future.delayed(Duration(milliseconds: 100)); // Wait 0.5 seconds before retrying
+//       return downloadPosterWithRetry(imageName, retries: retries - 1);
+//     } else {
+//       rethrow; // Rethrow the exception after retries are exhausted
+//     }
+//   }
+// }
+
+
+
 Future<String> downloadPoster(String posterPath) async {
-  const serverUrl = 'https://movie.bugsmachine.top/tmdb/image?image_link=';
+
+
+  print("download the poster");
+  const serverUrl = 'http://8.153.39.151:8080/api/tmdb/image?image_link=';
 
   Directory homeDir = Directory(Platform.environment['HOME']!);
   Directory documentsDir = Directory('${homeDir.path}/Documents');
@@ -145,8 +171,16 @@ Future<String> downloadPoster(String posterPath) async {
   final response = await http.get(Uri.parse('$serverUrl$posterPath'));
   if (response.statusCode == 200) {
     File file = File('${avatarFolder.path}/$posterPath');
-    await file.writeAsBytes(response.bodyBytes);
-    return file.path;
+    await file.writeAsBytes(response.bodyBytes, flush: true);
+
+    // wait 0.1s before returning the file path
+    // await Future.delayed(Duration(milliseconds: 500));
+    // Verify file after writing
+    if (await file.length() > 0) {
+      return file.path;
+    } else {
+      throw StateError('File is empty');
+    }
   } else {
     print('Failed to download avatar: ${response.statusCode}');
     print("Failed to download avatar: ${response.body}");
