@@ -71,7 +71,7 @@ Future<void> initDatabase() async {
   print("dbPath: $dbPath");
   db = await openDatabase(
     dbPath,
-    version: 20, // Increment the version number
+    version: 29, // Increment the version number
     onCreate: (db, version) {
       print("onCreate");
       return db.transaction((txn) async {
@@ -98,6 +98,10 @@ Future<void> initDatabase() async {
         await txn.execute('DROP TABLE IF EXISTS GenresAndFiles');
         await txn.execute('DROP TABLE IF EXISTS UserDefault');
         await txn.execute('DROP TABLE IF EXISTS Config');
+        await txn.execute('DROP TABLE IF EXISTS GenresIntl');
+        await txn.execute('DROP TABLE IF EXISTS MovieInfo');
+        await txn.execute('DROP TABLE IF EXISTS Cast');
+        await txn.execute('DROP TABLE IF EXISTS CastAndMovie');
 
         // Recreate tables with new schema
         await txn.execute('''
@@ -105,9 +109,21 @@ Future<void> initDatabase() async {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT NOT NULL,
     name TEXT NOT NULL,
-    type INTEGER NOT NULL,
+    type TEXT NOT NULL,
     group_id INTEGER NOT NULL,
     FOREIGN KEY (group_id) REFERENCES Groups(id)
+  )
+''');
+
+        await txn.execute('''
+  CREATE TABLE MovieInfo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL,
+    overview TEXT NOT NULL,
+    vote TEXT NOT NULL,
+    poster TEXT NOT NULL,
+    label TEXT NOT NULL,
+    FOREIGN KEY (file_id) REFERENCES Files(id)
   )
 ''');
 
@@ -181,15 +197,34 @@ Future<void> initDatabase() async {
           )
         ''');
 
+        await txn.execute('''
+          CREATE TABLE Cast (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            avatar TEXT NOT NULL,
+            tmdb_id TEXT NOT NULL
+          )
+        ''');
+
+        await txn.execute('''
+          CREATE TABLE CastAndMovie (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cast_id INTEGER,
+            file_id INTEGER,
+            character_name TEXT NOT NULL
+         
+          )
+        ''');
+
         // add groups
         await txn.execute('''INSERT INTO Groups(name, password, icon) VALUES ('Movies', '',"Icons.video_library_outlined");''');
         await txn.execute('''INSERT INTO Groups(name, password, icon) VALUES ('TV Shows', '',"Icons.video_library_outlined");''');
         await txn.execute('''INSERT INTO Groups(name, password, icon) VALUES ('Photos', '',"Icons.video_library_outlined");''');
 
         // add some example genres
-        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Action', 1);''');
-        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Comedy', 1);''');
-        await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Drama', 1);''');
+        // await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Action', 1);''');
+        // await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Comedy', 1);''');
+        // await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('Drama', 1);''');
 
         await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('aaaa', 2);''');
         await txn.execute('''INSERT INTO Genres(name, group_id) VALUES ('bbbb', 2);''');
@@ -215,6 +250,107 @@ Future<void> initDatabase() async {
     },
   );
 }
+
+Future<bool> insertFile(String path, String name, String type, int group) async{
+  print("insertFile");
+  var result = await db.insert('Files', {'path': path, 'name': name, 'type': type, 'group_id': group});
+  return result > 0;
+}
+
+Future<int> getFileIDByName(String name) async{
+  print("getFileIDByName");
+  List<Map<String, dynamic>> files = await db.query('Files', where: 'name = ?', whereArgs: [name]);
+  if (files.isEmpty) {
+    return -1;
+  }
+  return files[0]['id'];
+}
+
+Future<int> getGroupID(String name) async{
+  print("getGroupID");
+  List<Map<String, dynamic>> groups = await db.query('Groups', where: 'name = ?', whereArgs: [name]);
+  if (groups.isEmpty) {
+    return -1;
+  }
+  return groups[0]['id'];
+}
+
+Future<bool> insertGenres(String name, int group) async{
+  print("insertGenres");
+  var result = await db.insert('Genres', {'name': name, 'group_id': group});
+  return result > 0;
+}
+
+Future<bool> isGenreExist(String name, int group) async{
+  print("isGenresExist");
+  List<Map<String, dynamic>> genres = await db.query('Genres', where: 'name = ? AND group_id = ?', whereArgs: [name, group]);
+  return genres.isNotEmpty;
+}
+
+Future<bool> insertMovieInfo(int fileId, String overview, String vote, String poster, String label) async{
+  print("insertMovieInfo");
+  var result = await db.insert('MovieInfo', {'file_id': fileId, 'overview': overview, 'vote': vote, 'poster': poster, 'label': label});
+  return result > 0;
+}
+
+Future<bool> insertKeywords(String name) async{
+  print("insertTags");
+  var result = await db.insert('Keywords', {'keyword': name});
+  return result > 0;
+}
+
+Future<int> getKeywordIDByName(String keyword) async{
+  print("getKeywordIDByName");
+  List<Map<String, dynamic>> keywords = await db.query('Keywords', where: 'keyword = ?', whereArgs: [keyword]);
+  if (keywords.isEmpty) {
+    return -1;
+  }
+  return keywords[0]['id'];
+}
+
+Future<bool> insertFilesAndTags(int fileId, int keywordId) async{
+  print("insertFilesAndTags");
+  var result = await db.insert('FileKeywords', {'file_id': fileId, 'keyword_id': keywordId});
+  return result > 0;
+}
+
+Future<int> getGenreIDByNameAndGroup(String name, int groupID) async{
+  print("getGenreIDByNameAndGroup");
+  List<Map<String, dynamic>> genres = await db.query('Genres', where: 'name = ? AND group_id = ?', whereArgs: [name, groupID]);
+  if (genres.isEmpty) {
+    return -1;
+  }
+  return genres[0]['id'];
+}
+
+Future<bool> insertGenresAndFiles(int fileId, int genreId) async{
+  print("insertGenresAndFiles");
+  var result = await db.insert('GenresAndFiles', {'file_id': fileId, 'genre_id': genreId});
+  return result > 0;
+}
+
+
+Future<bool> insertCast(String name, String avatar, String ID) async{
+  print("insertCast");
+  var result = await db.insert('Cast', {'name': name, 'avatar': avatar, 'tmdb_id': ID});
+  return result > 0;
+}
+
+Future<int> getCastIDByTMDBID(String tmdbID) async{
+  print("getCastIDByTMDBID");
+  List<Map<String, dynamic>> cast = await db.query('Cast', where: 'tmdb_id = ?', whereArgs: [tmdbID]);
+  if (cast.isEmpty) {
+    return -1;
+  }
+  return cast[0]['id'];
+}
+
+Future<bool> insertCastAndMovie(int castId, int fileId, String characterName) async{
+  print("insertCastAndMovie");
+  var result = await db.insert('CastAndMovie', {'cast_id': castId, 'file_id': fileId, 'character_name': characterName});
+  return result > 0;
+}
+
 
 
 

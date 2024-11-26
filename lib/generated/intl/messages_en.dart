@@ -31,6 +31,7 @@ class MessageLookup extends MessageLookupByLibrary {
         "click_to_view": MessageLookupByLibrary.simpleMessage("Click to view "),
         "current_folder":
             MessageLookupByLibrary.simpleMessage("Current folder: "),
+        "custom": MessageLookupByLibrary.simpleMessage("Custom "),
         "delete_poster": MessageLookupByLibrary.simpleMessage("Delete poster"),
         "edit_file_detail":
             MessageLookupByLibrary.simpleMessage("Edit file detail"),
@@ -39,6 +40,7 @@ class MessageLookup extends MessageLookupByLibrary {
             MessageLookupByLibrary.simpleMessage("File detected: "),
         "file_name": MessageLookupByLibrary.simpleMessage("File name"),
         "file_path": MessageLookupByLibrary.simpleMessage("File path"),
+        "fitters": MessageLookupByLibrary.simpleMessage("Fitters: "),
         "genres": MessageLookupByLibrary.simpleMessage("Genres:"),
         "group": MessageLookupByLibrary.simpleMessage("Group: "),
         "last_modified_time":

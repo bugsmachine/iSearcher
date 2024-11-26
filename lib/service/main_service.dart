@@ -158,3 +158,8 @@ Future<void> _getVideoFilesRecursively(Directory dir, List<VideoFile> videoFiles
 
   }
 }
+
+
+Future<void> addFileToDB() async {
+
+}

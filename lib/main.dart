@@ -138,6 +138,7 @@ Future<void> promptAndSaveConfig(BuildContext context) async {
   bool? userConfirmed = await showDialog(
     context: context,
     builder: (context) => AlertDialog(
+      backgroundColor: Colors.white,
       title: Text('Permission Required'),
       content: Container(
         width: 300, // Set the desired width
@@ -436,21 +437,37 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
   Map<int,List<Map<String, dynamic>>> _genres = {};
   var _selectedGroup = "";
   var _selectedSubItem ="";
+  ValueNotifier<bool> sidebarUpdateNotifier = ValueNotifier(false);
 
   @override
   void initState() {
     super.initState();
-    _fetchGroups();
+    fetchGroups();
+    sidebarUpdateNotifier.addListener(_updateSidebar);
   }
 
-  Future<void> _fetchGroups() async {
+  @override
+  void dispose() {
+    sidebarUpdateNotifier.removeListener(_updateSidebar);
+    super.dispose();
+  }
+
+  void _updateSidebar() {
+    if (sidebarUpdateNotifier.value) {
+      fetchGroups(); // Fetch updated groups
+      sidebarUpdateNotifier.value = false; // Reset the notifier
+    }
+  }
+
+  Future<void> fetchGroups() async {
     List<Map<String, dynamic>> groups = await getGroups();
-    Map<int,List<Map<String, dynamic>>> allGenres = {};
+    Map<int, List<Map<String, dynamic>>> allGenres = {};
     for (var group in groups) {
       var groupID = group['id'];
       List<Map<String, dynamic>> genres = await getGenres(groupID);
       allGenres[group['id']] = genres;
-      print('Group ID: ${group['id']}, Name: ${group['name']} , Password: ${group['password']}');
+      print(
+          'Group ID: ${group['id']}, Name: ${group['name']} , Password: ${group['password']}');
     }
     setState(() {
       _groups = groups;
@@ -669,6 +686,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                   selected: _selectedItem == 'Unrecorded Films',
                   selectedTileColor: Colors.deepPurple,
                 ),
+
                 ..._groups.map((group) {
                   return ExpansionTile(
                     leading: Icon(getIconData(group['icon'])),
@@ -677,6 +695,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
                       style: TextStyle(fontSize: 13),
                     ),
                     children: [
+                      _buildSubItem(group, 'All'),
                       for (var genre in _genres[group['id']]!) _buildSubItem(group, genre['name']),
                     ],
                   );
@@ -713,8 +732,8 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
           setState(() {
             _selectedItem = key;
             _selectedIndex = group['id'];
-            _selectedGroup = group['name']; // Store the selected group
-            _selectedSubItem = subItem; // Store the selected sub-item
+            _selectedGroup = group['name'];
+            _selectedSubItem = subItem;
           });
           print("Clicked on $subItem in ${group['name']}");
         },
@@ -755,7 +774,7 @@ class _HomeScreenState extends State<HomeScreen> with WindowListener {
 
   Widget _buildMainContent() {
     if (_selectedIndex == 0) {
-      return UnrecordedFilmsView(lang: lang);
+      return UnrecordedFilmsView(lang: lang, sidebarUpdateNotifier: sidebarUpdateNotifier);
     } else if (_selectedIndex == _groups.length + 1) {
       return const Center(child: Text('Settings')); // Placeholder for settings
     } else if (_selectedGroup != null && _selectedSubItem != null) {

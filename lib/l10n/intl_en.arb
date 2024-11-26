@@ -39,5 +39,7 @@
   "s_profile" : "'s profile",
   "group" : "Group: ",
   "add_new_group" : "Add a new group",
-  "manage_group" : "Manage groups"
+  "manage_group" : "Manage groups",
+  "fitters" : "Fitters: ",
+  "custom" : "Custom "
 }

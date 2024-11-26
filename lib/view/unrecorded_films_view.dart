@@ -27,8 +27,9 @@ import '../service/local_file_operation.dart';
 
 class UnrecordedFilmsView extends StatefulWidget {
   final S lang;
+  final ValueNotifier<bool> sidebarUpdateNotifier;
 
-  const UnrecordedFilmsView({Key? key, required this.lang}) : super(key: key);
+  const UnrecordedFilmsView({Key? key, required this.lang, required this.sidebarUpdateNotifier}) : super(key: key);
 
 
   @override
@@ -125,6 +126,9 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
   ];
 
 
+  void _triggerSidebarUpdate() {
+    widget.sidebarUpdateNotifier.value = true; // Notify HomeScreen to update
+  }
 
   void addTag(String tag, [Color? color]) {
     setState(() {
@@ -481,8 +485,17 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
     }
   }
 
-  Future<void> _addFolder() async{
+  Future<void> _addFolder(BuildContext context) async{
+    LoadingOverlay.show(
+      context,
+      "Opening file picker...",
+      width: 250,
+      height: 150,
+    );
+
     String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+
+    LoadingOverlay.hide(context);
     if (selectedDirectory != null) {
       if(_platform == 'macos'){
         final secureBookmarks = SecureBookmarks();
@@ -539,7 +552,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
               IconButton(
                 icon: Icon(Icons.add),
                 onPressed: () async {
-                  await _addFolder();
+                  await _addFolder(context);
                 },
               ),
               IconButton(
@@ -576,7 +589,7 @@ class _UnrecordedFilmsViewState extends State<UnrecordedFilmsView> {
                 ? Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  await _addFolder();
+                  await _addFolder(context);
                 },
 
                 child: Text('Select Folder'),
@@ -1632,8 +1645,14 @@ Future<String> downloadPoster(String posterPath) async {
         ),
         TextButton(
           child: Text(widget.lang.submit),
-          onPressed: () {
-            print(_collectInfo());
+          onPressed: () async {
+            var result = await _collectInfo();
+            if (result) {
+              _triggerSidebarUpdate();
+              Navigator.of(context).pop();
+            }else{
+              print("Failed to collect info");
+            }
           },
         ),
       ],
@@ -2267,23 +2286,109 @@ Future<String> downloadPoster(String posterPath) async {
 
 
   // Method to collect all tags
-  Map<String,dynamic> _collectInfo() {
+  Future<bool> _collectInfo() async {
     Map<String,dynamic> info = {};
 
+    // info['movieName'] = filmNameController.text;
+    // info['imgPath'] = coverImg;
+    // info['fileType'] = _selectedFileType;
+    // info["group"] = _selectedGroup;
+    // info['filePaths'] = filePath;
+    // info['subtitlePath'] = _selectedSubtitlePath ?? '';
+    // info['overview'] = _movieOverview;
+    // info['vote'] = _vote;
+    // info['genres'] = genresWithColors.map((genre) => genre['tag']).toList();
+    // info['tags'] = tagsWithColors.map((tag) => tag['tag']).toList();
+    // info['cast'] = _cast;
+    // info['labels'] = movieLabels;
 
-    info['movieName'] = filmNameController.text;
-    info['imgPath'] = coverImg;
-    info['fileType'] = _selectedFileType;
-    info["group"] = _selectedGroup;
-    info['filePaths'] = filePath;
-    info['subtitlePath'] = _selectedSubtitlePath ?? '';
-    info['overview'] = _movieOverview;
-    info['vote'] = _vote;
-    info['genres'] = genresWithColors.map((genre) => genre['tag']).toList();
-    info['tags'] = tagsWithColors.map((tag) => tag['tag']).toList();
-    info['cast'] = _cast;
+    int groupID = await getGroupID(_selectedGroup);
+    var result = await insertFile(filePath, filmNameController.text, _selectedFileType, groupID);
 
-    return info;
+    if(result == 0){
+      print("Insert file failed");
+      return false;
+    }
+
+    var fileID = await getFileIDByName(filmNameController.text);
+    for (var genre in genresWithColors) {
+      var genreName = genre['tag'];
+
+      var isExist = await isGenreExist(genreName, groupID);
+      if (isExist) {
+        print("Genre already exist: $genreName");
+      }else{
+        result = await insertGenres(genreName, groupID);
+        if(result == 0){
+          print("Insert genre failed: " + genreName);
+          return false;
+        }
+      }
+
+
+      var genreID = await getGenreIDByNameAndGroup(genreName, groupID);
+      result = await insertGenresAndFiles(fileID, genreID);
+
+      if(result == 0){
+        print("Insert genre and file failed: " + genreName);
+        return false;
+      }
+    }
+    //convert the movie label to string using & to separate each item
+    String movieLabelsString = "";
+    for (var key in movieLabels.keys) {
+      movieLabelsString += "$key:${movieLabels[key]!}&";
+    }
+
+    result = await insertMovieInfo(fileID, _movieOverview, _vote, coverImg, movieLabelsString);
+    if (result == 0) {
+      print("Insert movie info failed");
+      return false;
+    }
+
+    for(var tags in tagsWithColors){
+      var name = tags['tag'];
+      result = await insertKeywords(name);
+
+      if(result == 0){
+        print("Insert keyword failed: " + name);
+        return false;
+      }
+
+      var keywordID = await getKeywordIDByName(name);
+      result = await insertFilesAndTags(fileID, keywordID);
+
+      if(result == 0){
+        print("Insert file and tag failed: " + name);
+        return false;
+      }
+    }
+
+    for(var cast in _cast){
+      var name = cast['name'];
+      var profilePath = cast['profile_path'];
+      var character = cast['character'];
+
+      var id = cast['id'];
+      result = await insertCast(name!, profilePath!, id!);
+
+      if(result == 0){
+        print("Insert cast failed: " + name);
+        return false;
+      }
+
+      var castID = await getCastIDByTMDBID(id);
+      result = await insertCastAndMovie(castID, fileID, character!);
+
+      if(result == 0){
+        print("Insert file and cast failed: " + name);
+        return false;
+      }
+    }
+
+    print("Insert file success");
+
+    return true;
   }
 
   Widget _buildNonEditableField(String label, String value, String tooltipMessage) {

@@ -29,6 +29,7 @@ class MessageLookup extends MessageLookupByLibrary {
         "cancel": MessageLookupByLibrary.simpleMessage("取消"),
         "click_to_view": MessageLookupByLibrary.simpleMessage("點擊查看"),
         "current_folder": MessageLookupByLibrary.simpleMessage("目前資料夾: "),
+        "custom": MessageLookupByLibrary.simpleMessage("自定義 "),
         "delete_poster": MessageLookupByLibrary.simpleMessage("刪除海報"),
         "edit_file_detail": MessageLookupByLibrary.simpleMessage("編輯檔案詳情"),
         "edit_overview": MessageLookupByLibrary.simpleMessage("編輯概覽"),

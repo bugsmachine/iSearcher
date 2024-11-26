@@ -39,5 +39,7 @@
   "s_profile": "的个人资料",
   "group": "分组: ",
   "add_new_group": "添加新分组",
-  "manage_group": "管理分组"
+  "manage_group": "管理分组",
+  "fitters": "筛选: ",
+  "custom": "自定义 "
 }

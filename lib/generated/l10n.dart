@@ -459,6 +459,26 @@ class S {
       args: [],
     );
   }
+
+  /// `Fitters: `
+  String get fitters {
+    return Intl.message(
+      'Fitters: ',
+      name: 'fitters',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Custom `
+  String get custom {
+    return Intl.message(
+      'Custom ',
+      name: 'custom',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

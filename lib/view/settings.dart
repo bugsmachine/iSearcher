@@ -40,8 +40,8 @@ class _SettingsWindowState extends State<SettingsWindow> {
     // Get the Documents directory dynamically
     // /Users/{username}/Library/Containers/top.homecinema.homeCinemaApp/Data/Documents/Posters
 
-    String directoryPath = '/Users/$username/Library/Containers/top.homecinema.homeCinemaApp/Data/Documents/Posters';
-
+    String directoryPath = '/Users/$username/Library/Containers/top.bugsmachine.iSearcher/Data/Documents/Posters';
+    print("asasas$directoryPath");
     // Directory object for the given path
     final directory = Directory(directoryPath);
 
@@ -87,13 +87,16 @@ class _SettingsWindowState extends State<SettingsWindow> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: Text('Settings'),
       ),
       body: Row(
         children: [
           // Sidebar
           NavigationRail(
+            backgroundColor: Colors.white,
             selectedIndex: _getSelectedIndex(),
             onDestinationSelected: (int index) {
               setState(() {

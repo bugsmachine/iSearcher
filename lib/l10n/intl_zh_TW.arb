@@ -39,5 +39,7 @@
   "s_profile": "的個人資料",
   "group": "分組: ",
   "add_new_group": "新增分組",
-  "manage_group": "管理分組"
+  "manage_group": "管理分組",
+  "Fitters": "篩選: ",
+  "custom": "自定義 "
 }
