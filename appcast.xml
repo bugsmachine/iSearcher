@@ -5,7 +5,7 @@
         <item>
             <title>1.0.2</title>
             <pubDate>Wed, 16 Oct 2024 00:05:25 +0800</pubDate>
-            <sparkle:version>2</sparkle:version>
+            <sparkle:version>3</sparkle:version>
             <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/bugsmachine/iSearcher/releases/download/v1.0.2/iSearcher.zip" length="37838942" type="application/octet-stream" sparkle:edSignature="+cHHw0aZFGfj4Gl6q2qZumI3HVUX/eX9qmU5b6aQUtzhPiE/7wyNRlIRdVLcS3RPYncS5/hCrwm5zRiTIVNECQ=="/>
